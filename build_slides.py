@@ -344,20 +344,36 @@ def uml(nodes,edges,path):
         if simple is not None:
             return join_orthogonal(a,simple,b)
         return join_orthogonal(a,route_astar(a,b,ai,bi),b)
+    def inheritance_path(a,b,ai,bi):
+        # Child below parent: inverted-T with vertical stubs so the hollow
+        # triangle always points into the parent's bottom edge (never sideways).
+        bus=round((a[1]+b[1])/2,1)
+        for bus_y in (bus, round(a[1]+(b[1]-a[1])*0.4,1), round(a[1]+(b[1]-a[1])*0.65,1)):
+            pts=simplify([a,(a[0],bus_y),(b[0],bus_y),b])
+            if clear_path(pts,ignore={ai,bi}): return pts
+        return simplify([a,(a[0],bus),(b[0],bus),b])
     c.setStrokeColor(HexColor('#17212E')); c.setLineWidth(1.9); c.setLineJoin(0)
     for ai,bi,t in edges:
         a,b=pick_anchors(ai,bi,t)
-        points=route(a,b,ai,bi)
+        if t in ('gen','real') and b[1]>=a[1]-8:
+            points=inheritance_path(a,b,ai,bi)
+        else:
+            points=route(a,b,ai,bi)
         if not all(abs(u[0]-v[0])<0.01 or abs(u[1]-v[1])<0.01 for u,v in zip(points,points[1:])):
             points=join_orthogonal(a,[],b)
         assert all(abs(u[0]-v[0])<0.01 or abs(u[1]-v[1])<0.01 for u,v in zip(points,points[1:])), (a,b,points)
         dx=b[0]-points[-2][0]; dy=b[1]-points[-2][1]
         length=math.hypot(dx,dy) or 1; ux,uy=dx/length,dy/length; vx,vy=-uy,ux
         c.setDash(6,3) if t in ('dep','real') else c.setDash()
-        for pa,pb in zip(points,points[1:]): c.line(*pa,*pb)
+        # Stop the shaft before the hollow triangle so stroke and fill do not clash.
+        draw_pts=list(points)
+        if t in ('gen','real') and len(draw_pts)>=2:
+            tip_back=(b[0]-12*ux,b[1]-12*uy)
+            draw_pts=draw_pts[:-1]+[tip_back]
+        for pa,pb in zip(draw_pts,draw_pts[1:]): c.line(*pa,*pb)
         c.setDash()
         if t in ('gen','real'):
-            tip=(b[0]-2*ux,b[1]-2*uy)
+            tip=b
             p=c.beginPath(); p.moveTo(*tip)
             p.lineTo(tip[0]-12*ux+5.5*vx,tip[1]-12*uy+5.5*vy)
             p.lineTo(tip[0]-12*ux-5.5*vx,tip[1]-12*uy-5.5*vy); p.close()
@@ -491,6 +507,40 @@ def wrap(text,font,size,width):
         result.append(line)
     return result
 
+KW_PSEUDO={'new','if','else','elif','for','in','return','assert','not','and','or','true','false','null','None','static','synchronized','while','class','def','function','var','let','const','this'}
+CODE_COLORS={'kw':'#0B57D0','id':'#18356F','type':'#0F766E','str':'#B14747','cmt':'#64748B','num':'#9A3412','op':'#4B5563'}
+def tokenize_pseudo(line):
+    if '//' in line:
+        code,_,cmt=line.partition('//')
+        runs=tokenize_pseudo(code) if code else []
+        runs.append(('//'+cmt, CODE_COLORS['cmt']))
+        return runs
+    runs=[]; i=0
+    while i<len(line):
+        ch=line[i]
+        if ch in ' \t':
+            j=i
+            while j<len(line) and line[j] in ' \t': j+=1
+            runs.append((line[i:j], CODE_COLORS['id'])); i=j; continue
+        if ch in '"\'':
+            q=ch; j=i+1
+            while j<len(line) and line[j]!=q: j+=1
+            j=min(j+1,len(line)); runs.append((line[i:j], CODE_COLORS['str'])); i=j; continue
+        if ch.isdigit():
+            j=i
+            while j<len(line) and (line[j].isalnum() or line[j]=='.'): j+=1
+            runs.append((line[i:j], CODE_COLORS['num'])); i=j; continue
+        if ch.isalpha() or ch=='_':
+            j=i
+            while j<len(line) and (line[j].isalnum() or line[j]=='_'): j+=1
+            tok=line[i:j]
+            if tok in KW_PSEUDO: col=CODE_COLORS['kw']
+            elif tok[0].isupper(): col=CODE_COLORS['type']
+            else: col=CODE_COLORS['id']
+            runs.append((tok, col)); i=j; continue
+        runs.append((ch, CODE_COLORS['op'])); i+=1
+    return runs or [('', CODE_COLORS['id'])]
+
 W,H=1440,810
 PDF=canvas.Canvas(str(OUT/'Design Patterns.pdf'),pagesize=(W,H))
 SLIDES=[]
@@ -503,6 +553,15 @@ for idx,d in enumerate(DATA):
         PDF.setFillColor(HexColor(color));PDF.setFont(font,size)
         for j,line in enumerate(lines):PDF.drawString(x,H-y-size-j*leading,line)
         elements.append(('text',x,y,w,len(lines)*leading,s,size,color,font,leading))
+        return y+len(lines)*leading
+    def code(s,x,y,w,size=16,leading=21):
+        lines=s.split('\n'); PDF.setFont('Courier',size)
+        for j,line in enumerate(lines):
+            cx=x; yy=H-y-size-j*leading
+            for tok,col in tokenize_pseudo(line):
+                PDF.setFillColor(HexColor(col)); PDF.drawString(cx,yy,tok)
+                cx+=pdfmetrics.stringWidth(tok,'Courier',size)
+        elements.append(('code',x,y,w,len(lines)*leading,s,size,'Courier',leading))
         return y+len(lines)*leading
     rect(0,0,W,H,'#FFFFFF')
     title_size=44 if len(d['title'])<15 else 39
@@ -529,19 +588,19 @@ for idx,d in enumerate(DATA):
         uml(d['pnodes' if key=='problem' else 'snodes'],d['pedges' if key=='problem' else 'sedges'],str(imagepath))
         PDF.drawImage(str(imagepath),x+11,H-234-247,660,247)
         elements.append(('image',x+11,234,660,247,str(imagepath)))
-    for x,label,code in [(24,'Client Code (Before)',d['before']),(732,'Client Code (After)',d['after'])]:
+    for x,label,src in [(24,'Client Code (Before)',d['before']),(732,'Client Code (After)',d['after'])]:
         rect(x,494,684,140,'#DFE3EC')
         rect(x+2,496,680,136,'#F8F9FC')
         rect(x+2,496,680,28,'#E4E7F0')
         text(label,x+12,499,550,17,'#161D2B',font='Helvetica-Bold')
         text('Pseudocode',x+574,502,100,11,'#667085')
-        text(code,x+14,533,650,16,'#18356F',font='Courier',leading=21)
+        code(src,x+14,533,650,16,21)
     rect(24,645,1392,130,'#DFE3EC')
     rect(26,647,1388,126,'#F8F9FC')
     rect(26,647,1388,27,'#E4E7F0')
     text('Key Implementation / Notable Module',36,650,1200,17,'#161D2B',font='Helvetica-Bold')
     text('Pseudocode',1296,653,105,11,'#667085')
-    text(d['module'],38,682,1364,15,'#18356F',font='Courier',leading=17)
+    code(d['module'],38,682,1364,15,17)
     slug=d['title'].lower().replace(' ','-');url='https://refactoring.guru/design-patterns/'+slug;d['url']=url
     text('Source: '+url,24,788,800,10,'#566174')
     text('UML: hollow triangle = inheritance / realization; dashed open arrow = dependency',840,788,580,10,'#566174')
@@ -553,12 +612,21 @@ PDF.save()
 NS='http://schemas.openxmlformats.org/presentationml/2006/main';A='http://schemas.openxmlformats.org/drawingml/2006/main';R='http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 def emu(v):return str(round(v*12700))
 def xfrm(x,y,w,h):return f'<a:xfrm><a:off x="{emu(x)}" y="{emu(y)}"/><a:ext cx="{emu(w)}" cy="{emu(h)}"/></a:xfrm>'
+def run_xml(text,size,color,face,bold=''):
+    return f'<a:r><a:rPr lang="en-US" sz="{round(size*100)}"{bold}><a:solidFill><a:srgbClr val="{color[1:]}"/></a:solidFill><a:latin typeface="{face}"/></a:rPr><a:t xml:space="preserve">{escape(text)}</a:t></a:r>'
 def xmltext(e,i):
     _,x,y,w,h,s,size,color,font,leading=e
     face='Courier New' if font=='Courier' else 'Arial'
     bold=' b="1"' if font.endswith('Bold') else ''
-    paragraphs=''.join(f'<a:p><a:pPr><a:lnSpc><a:spcPts val="{round(leading*100)}"/></a:lnSpc></a:pPr><a:r><a:rPr lang="en-US" sz="{round(size*100)}"{bold}><a:solidFill><a:srgbClr val="{color[1:]}"/></a:solidFill><a:latin typeface="{face}"/></a:rPr><a:t xml:space="preserve">{escape(line)}</a:t></a:r><a:endParaRPr sz="{round(size*100)}"/></a:p>' for line in wrap(s,font,size,w))
+    paragraphs=''.join(f'<a:p><a:pPr><a:lnSpc><a:spcPts val="{round(leading*100)}"/></a:lnSpc></a:pPr>{run_xml(line,size,color,face,bold)}<a:endParaRPr sz="{round(size*100)}"/></a:p>' for line in wrap(s,font,size,w))
     return f'<p:sp><p:nvSpPr><p:cNvPr id="{i}" name="Text {i}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>{xfrm(x,y,w,h+5)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0"/><a:lstStyle/>{paragraphs}</p:txBody></p:sp>'
+def xmlcode(e,i):
+    _,x,y,w,h,s,size,font,leading=e
+    paragraphs=[]
+    for line in s.split('\n'):
+        runs=''.join(run_xml(tok,size,col,'Courier New') for tok,col in tokenize_pseudo(line)) or run_xml(' ',size,CODE_COLORS['id'],'Courier New')
+        paragraphs.append(f'<a:p><a:pPr><a:lnSpc><a:spcPts val="{round(leading*100)}"/></a:lnSpc></a:pPr>{runs}<a:endParaRPr sz="{round(size*100)}"/></a:p>')
+    return f'<p:sp><p:nvSpPr><p:cNvPr id="{i}" name="Code {i}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>{xfrm(x,y,w,h+5)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0"/><a:lstStyle/>{"".join(paragraphs)}</p:txBody></p:sp>'
 def rels(items):return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+''.join(f'<Relationship Id="{i}" Type="{R}/{typ}" Target="{target}"/>' for i,typ,target in items)+'</Relationships>'
 group='<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>'
 with zipfile.ZipFile(OUT/'Design Patterns.pptx','w',zipfile.ZIP_DEFLATED) as z:
@@ -576,6 +644,7 @@ with zipfile.ZipFile(OUT/'Design Patterns.pptx','w',zipfile.ZIP_DEFLATED) as z:
         for i,e in enumerate(elements,2):
             typ,x,y,w,h,*rest=e
             if typ=='text':shapes.append(xmltext(e,i))
+            elif typ=='code':shapes.append(xmlcode(e,i))
             elif typ=='rect':
                 fill=rest[0][1:];shapes.append(f'<p:sp><p:nvSpPr><p:cNvPr id="{i}" name="Panel {i}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>{xfrm(x,y,w,h)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="{fill}"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr></p:sp>')
             else:
@@ -594,6 +663,13 @@ for elements in SLIDES:
         typ,x,y,w,h,*r=e;style=f'position:absolute;left:{x}px;top:{y}px;width:{w}px;height:{h}px;'
         if typ=='rect':parts.append(f'<div style="{style}background:{r[0]}"></div>')
         elif typ=='image':parts.append(f'<img alt="UML class diagram" style="{style}" src="data:image/png;base64,{base64.b64encode(Path(r[0]).read_bytes()).decode()}">')
+        elif typ=='code':
+            s,size,font,leading=r
+            rows=[]
+            for line in s.split('\n'):
+                spans=''.join(f'<span style="color:{col}">{html.escape(tok)}</span>' for tok,col in tokenize_pseudo(line)) or '&nbsp;'
+                rows.append(spans)
+            parts.append(f'<div style="{style}font-family:Courier New,monospace;font-size:{size}px;line-height:{leading}px;white-space:pre;">{("<br>".join(rows))}</div>')
         else:
             s,size,color,font,leading=r;family='Courier New' if font=='Courier' else 'Arial';weight='bold' if font.endswith('Bold') else 'normal'
             lines=wrap(s,font,size,w);parts.append(f'<div style="{style}font-family:{family};font-size:{size}px;line-height:{leading}px;color:{color};font-weight:{weight};white-space:pre;">{html.escape(chr(10).join(lines))}</div>')
