@@ -1,0 +1,1378 @@
+[
+  {
+    "title": "Singleton",
+    "category": "Creational",
+    "case": "Shared database connection",
+    "desc": "Provide one shared instance through a controlled access point.",
+    "problem": "Independent callers create separate database connections.",
+    "solution": "Hide construction; return the same instance to every caller.",
+    "before": "a = new Database()\nb = new Database()\na.query(sql)\n// a and b are different objects",
+    "after": "a = Database.getInstance()\nb = Database.getInstance()\na.query(sql)\nassert a is b",
+    "module": "// Database: lazy, thread-safe accessor\nstatic synchronized getInstance():\n    if instance == null: instance = new Database()\n    return instance",
+    "pnodes": [
+      [
+        "Application",
+        "+ run()",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "Database",
+        "+ Database()\n+ query(sql)",
+        2,
+        1,
+        "class"
+      ]
+    ],
+    "pedges": [
+      [
+        0,
+        1,
+        "dep"
+      ]
+    ],
+    "snodes": [
+      [
+        "Application",
+        "+ run()",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "Database",
+        "- instance: Database {static}\n- Database()\n+ getInstance(): Database {static}\n+ query(sql)",
+        2,
+        1,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        0,
+        1,
+        "dep"
+      ]
+    ],
+    "reuse": "Singleton Pattern_ Thread-Safe Instance Sharing.png",
+    "url": "https://refactoring.guru/design-patterns/singleton"
+  },
+  {
+    "title": "Factory Method",
+    "category": "Creational",
+    "case": "Road and sea logistics",
+    "desc": "Let creator subclasses choose the product used by shared business logic.",
+    "problem": "Logistics directly constructs trucks; sea delivery forces edits.",
+    "solution": "Override a creation method while preserving delivery planning.",
+    "before": "truck = new Truck()\ntruck.deliver()\n// sea support needs another branch",
+    "after": "logistics = new SeaLogistics()\nlogistics.planDelivery()\n// planning uses Transport",
+    "module": "// Logistics.planDelivery()\nvehicle = createTransport()\nvehicle.deliver()\n// SeaLogistics.createTransport(): return new Ship()",
+    "pnodes": [
+      [
+        "Logistics",
+        "+ planDelivery()",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "Truck",
+        "+ deliver()",
+        2,
+        1,
+        "class"
+      ]
+    ],
+    "pedges": [
+      [
+        0,
+        1,
+        "dep"
+      ]
+    ],
+    "snodes": [
+      [
+        "Logistics",
+        "+ planDelivery()\n+ createTransport(): Transport",
+        0,
+        0,
+        "abstract"
+      ],
+      [
+        "Transport",
+        "+ deliver()",
+        2,
+        0,
+        "interface"
+      ],
+      [
+        "RoadLogistics",
+        "+ createTransport(): Transport",
+        0,
+        1,
+        "class"
+      ],
+      [
+        "SeaLogistics",
+        "+ createTransport(): Transport",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "Truck",
+        "+ deliver()",
+        2,
+        1,
+        "class"
+      ],
+      [
+        "Ship",
+        "+ deliver()",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        2,
+        0,
+        "gen"
+      ],
+      [
+        3,
+        0,
+        "gen"
+      ],
+      [
+        0,
+        1,
+        "dep"
+      ],
+      [
+        4,
+        1,
+        "real"
+      ],
+      [
+        5,
+        1,
+        "real"
+      ]
+    ],
+    "reuse": "Factory Pattern Infographic_ Before and After (1).png",
+    "url": "https://refactoring.guru/design-patterns/factory-method"
+  },
+  {
+    "title": "Abstract Factory",
+    "category": "Creational",
+    "case": "Matching furniture families",
+    "desc": "Create related products through a family-specific factory.",
+    "problem": "Direct construction can mix modern chairs with Victorian sofas.",
+    "solution": "Select one family factory; request products through interfaces.",
+    "before": "chair = new ModernChair()\nsofa = new VictorianSofa()\n// mismatched furniture family",
+    "after": "factory = new ModernFactory()\nchair = factory.createChair()\nsofa = factory.createSofa()",
+    "module": "// ModernFactory\ncreateChair(): return new ModernChair()\ncreateSofa():  return new ModernSofa()\n// VictorianFactory returns Victorian products",
+    "pnodes": [
+      [
+        "Shop",
+        "+ furnish()",
+        1,
+        0,
+        "class"
+      ],
+      [
+        "ModernChair",
+        "+ sitOn()",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "VictorianSofa",
+        "+ lieOn()",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "pedges": [
+      [
+        0,
+        1,
+        "dep"
+      ],
+      [
+        0,
+        2,
+        "dep"
+      ]
+    ],
+    "snodes": [
+      [
+        "FurnitureFactory",
+        "+ createChair(): Chair\n+ createSofa(): Sofa",
+        0,
+        0,
+        "interface"
+      ],
+      [
+        "ModernFactory",
+        "+ createChair(): Chair\n+ createSofa(): Sofa",
+        0,
+        1,
+        "class"
+      ],
+      [
+        "VictorianFactory",
+        "+ createChair(): Chair\n+ createSofa(): Sofa",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "Chair",
+        "+ sitOn()",
+        1,
+        0,
+        "interface"
+      ],
+      [
+        "Sofa",
+        "+ lieOn()",
+        2,
+        0,
+        "interface"
+      ],
+      [
+        "ModernChair",
+        "+ sitOn()",
+        1,
+        1,
+        "class"
+      ],
+      [
+        "VictorianChair",
+        "+ sitOn()",
+        1,
+        2,
+        "class"
+      ],
+      [
+        "ModernSofa",
+        "+ lieOn()",
+        2,
+        1,
+        "class"
+      ],
+      [
+        "VictorianSofa",
+        "+ lieOn()",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        1,
+        0,
+        "real"
+      ],
+      [
+        2,
+        0,
+        "real"
+      ],
+      [
+        5,
+        3,
+        "real"
+      ],
+      [
+        6,
+        3,
+        "real"
+      ],
+      [
+        7,
+        4,
+        "real"
+      ],
+      [
+        8,
+        4,
+        "real"
+      ]
+    ],
+    "reuse": "abstractfactory.png",
+    "url": "https://refactoring.guru/design-patterns/abstract-factory"
+  },
+  {
+    "title": "Builder",
+    "category": "Creational",
+    "case": "Cars and their manuals",
+    "desc": "Separate construction steps from the representation being assembled.",
+    "problem": "Long car constructors and separate manual assembly duplicate choices.",
+    "solution": "A director runs the same recipe against different builders.",
+    "before": "car = new Car(2, sportEngine, true)\nmanual = new Manual(2, \"sport\", \"GPS\")\n// maintain the same recipe twice",
+    "after": "builder = new CarBuilder()\ndirector.sportsCar(builder)\ncar = builder.getResult()\n// use ManualBuilder for a matching manual",
+    "module": "// Director.sportsCar(builder)\nbuilder.reset()\nbuilder.setSeats(2)\nbuilder.setEngine(sportEngine)\nbuilder.setGPS(true)",
+    "pnodes": [
+      [
+        "Client",
+        "+ assemble()",
+        1,
+        0,
+        "class"
+      ],
+      [
+        "Car",
+        "+ Car(seats, engine, gps)",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "Manual",
+        "+ Manual(seats, engine, gps)",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "pedges": [
+      [
+        0,
+        1,
+        "dep"
+      ],
+      [
+        0,
+        2,
+        "dep"
+      ]
+    ],
+    "snodes": [
+      [
+        "Director",
+        "+ sportsCar(b: Builder)",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "Builder",
+        "+ reset()\n+ setSeats(n)\n+ setEngine(e)\n+ setGPS(on)",
+        2,
+        0,
+        "interface"
+      ],
+      [
+        "CarBuilder",
+        "+ getResult(): Car",
+        1,
+        2,
+        "class"
+      ],
+      [
+        "ManualBuilder",
+        "+ getResult(): Manual",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        0,
+        1,
+        "dep"
+      ],
+      [
+        2,
+        1,
+        "real"
+      ],
+      [
+        3,
+        1,
+        "real"
+      ]
+    ],
+    "reuse": "",
+    "url": "https://refactoring.guru/design-patterns/builder"
+  },
+  {
+    "title": "Adapter",
+    "category": "Structural",
+    "case": "XML stock data and JSON analytics",
+    "desc": "Translate an existing interface into the interface a client expects.",
+    "problem": "The stock app supplies XML; the analytics library requires JSON.",
+    "solution": "An adapter accepts XML, converts it, then delegates analytics.",
+    "before": "xml = provider.getStockData()\nlibrary = new JsonAnalyticsLibrary()\nreport = library.analyze(xml)\n// incompatible input format",
+    "after": "service = new XmlAnalyticsAdapter(library)\nxml = provider.getStockData()\nreport = service.analyze(xml)",
+    "module": "// XmlAnalyticsAdapter.analyze(xml)\njson = convertXmlToJson(xml)\nreturn library.analyze(json)",
+    "pnodes": [
+      [
+        "StockApplication",
+        "+ analyzeStocks()",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "StockDataProvider",
+        "+ getStockData(): XML",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "JsonAnalyticsLibrary",
+        "+ analyze(json): Report",
+        2,
+        1,
+        "class"
+      ]
+    ],
+    "pedges": [
+      [
+        0,
+        1,
+        "dep"
+      ],
+      [
+        0,
+        2,
+        "dep"
+      ]
+    ],
+    "snodes": [
+      [
+        "StockApplication",
+        "- analytics: AnalyticsService",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "AnalyticsService",
+        "+ analyze(xml): Report",
+        2,
+        0,
+        "interface"
+      ],
+      [
+        "XmlAnalyticsAdapter",
+        "- library: JsonAnalyticsLibrary\n+ analyze(xml): Report",
+        2,
+        1,
+        "class"
+      ],
+      [
+        "JsonAnalyticsLibrary",
+        "+ analyze(json): Report",
+        0,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        0,
+        1,
+        "assoc"
+      ],
+      [
+        2,
+        1,
+        "real"
+      ],
+      [
+        2,
+        3,
+        "assoc"
+      ]
+    ],
+    "reuse": "adapter.png",
+    "url": "https://refactoring.guru/design-patterns/adapter"
+  },
+  {
+    "title": "Bridge",
+    "category": "Structural",
+    "case": "Shapes and colors",
+    "desc": "Separate two independent dimensions so both can evolve independently.",
+    "problem": "Each shape/color combination requires another subclass.",
+    "solution": "Shapes hold a Color reference instead of encoding color in inheritance.",
+    "before": "redCircle = new RedCircle()\nblueSquare = new BlueSquare()\nredCircle.draw()\n// more combinations, more classes",
+    "after": "shape = new Circle(new Red())\nshape.draw()\nshape.color = new Blue()\nshape.draw()",
+    "module": "// Circle.draw()\ncolor.apply()\nrenderCircleGeometry()\n// color and geometry vary independently",
+    "pnodes": [
+      [
+        "Shape",
+        "+ draw()",
+        1,
+        0,
+        "abstract"
+      ],
+      [
+        "RedCircle",
+        "+ draw()",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "BlueCircle",
+        "+ draw()",
+        1,
+        2,
+        "class"
+      ],
+      [
+        "RedSquare",
+        "+ draw()",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "pedges": [
+      [
+        1,
+        0,
+        "gen"
+      ],
+      [
+        2,
+        0,
+        "gen"
+      ],
+      [
+        3,
+        0,
+        "gen"
+      ]
+    ],
+    "snodes": [
+      [
+        "Shape",
+        "- color: Color\n+ draw() {abstract}",
+        0,
+        0,
+        "abstract"
+      ],
+      [
+        "Color",
+        "+ apply()",
+        2,
+        0,
+        "interface"
+      ],
+      [
+        "Circle",
+        "+ draw()",
+        0,
+        1,
+        "class"
+      ],
+      [
+        "Square",
+        "+ draw()",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "Red",
+        "+ apply()",
+        2,
+        1,
+        "class"
+      ],
+      [
+        "Blue",
+        "+ apply()",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        0,
+        1,
+        "assoc"
+      ],
+      [
+        2,
+        0,
+        "gen"
+      ],
+      [
+        3,
+        0,
+        "gen"
+      ],
+      [
+        4,
+        1,
+        "real"
+      ],
+      [
+        5,
+        1,
+        "real"
+      ]
+    ],
+    "reuse": "bridge.png",
+    "url": "https://refactoring.guru/design-patterns/bridge"
+  },
+  {
+    "title": "Facade",
+    "category": "Structural",
+    "case": "Video conversion subsystem",
+    "desc": "Expose a simple entry point to a complex subsystem.",
+    "problem": "Every client coordinates codecs, bitrate conversion, and audio repair.",
+    "solution": "A facade orchestrates the subsystem behind one conversion call.",
+    "before": "codec = CodecFactory.extract(file)\nraw = BitrateReader.read(file, codec)\nvideo = BitrateReader.convert(raw, mp4)\nresult = AudioMixer.fix(video)",
+    "after": "converter = new VideoConverter()\nresult = converter.convert(file, \"mp4\")",
+    "module": "// VideoConverter.convert(file, format)\nsource = CodecFactory.extract(file)\nraw = BitrateReader.read(file, source)\nvideo = BitrateReader.convert(raw, codecFor(format))\nreturn AudioMixer.fix(video)",
+    "pnodes": [
+      [
+        "Client",
+        "+ export()",
+        1,
+        0,
+        "class"
+      ],
+      [
+        "CodecFactory",
+        "+ extract(file)",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "BitrateReader",
+        "+ read()\n+ convert()",
+        1,
+        2,
+        "class"
+      ],
+      [
+        "AudioMixer",
+        "+ fix(video)",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "pedges": [
+      [
+        0,
+        1,
+        "dep"
+      ],
+      [
+        0,
+        2,
+        "dep"
+      ],
+      [
+        0,
+        3,
+        "dep"
+      ]
+    ],
+    "snodes": [
+      [
+        "Client",
+        "+ export()",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "VideoConverter",
+        "+ convert(file, format): File",
+        2,
+        0,
+        "class"
+      ],
+      [
+        "CodecFactory",
+        "+ extract(file)",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "BitrateReader",
+        "+ read()\n+ convert()",
+        1,
+        2,
+        "class"
+      ],
+      [
+        "AudioMixer",
+        "+ fix(video)",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        0,
+        1,
+        "dep"
+      ],
+      [
+        1,
+        2,
+        "dep"
+      ],
+      [
+        1,
+        3,
+        "dep"
+      ],
+      [
+        1,
+        4,
+        "dep"
+      ]
+    ],
+    "reuse": "facade.png",
+    "url": "https://refactoring.guru/design-patterns/facade"
+  },
+  {
+    "title": "Proxy",
+    "category": "Structural",
+    "case": "Cached third-party video service",
+    "desc": "Control access to a service through the same interface.",
+    "problem": "Repeated video downloads invoke the remote service again.",
+    "solution": "A proxy caches results and delegates only on a cache miss.",
+    "before": "service = new ThirdPartyVideoService()\na = service.downloadVideo(id)\nb = service.downloadVideo(id)\n// two remote requests",
+    "after": "service = new CachedVideoProxy(realService)\na = service.downloadVideo(id)\nb = service.downloadVideo(id)\n// second request uses the cache",
+    "module": "// CachedVideoProxy.downloadVideo(id)\nif not cache.contains(id):\n    cache[id] = real.downloadVideo(id)\nreturn cache[id]",
+    "pnodes": [
+      [
+        "VideoManager",
+        "+ play(id)",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "ThirdPartyVideoService",
+        "+ downloadVideo(id): Video",
+        2,
+        1,
+        "class"
+      ]
+    ],
+    "pedges": [
+      [
+        0,
+        1,
+        "dep"
+      ]
+    ],
+    "snodes": [
+      [
+        "VideoManager",
+        "- service: VideoService",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "VideoService",
+        "+ downloadVideo(id): Video",
+        2,
+        0,
+        "interface"
+      ],
+      [
+        "CachedVideoProxy",
+        "- real: VideoService\n- cache: Map\n+ downloadVideo(id): Video",
+        1,
+        2,
+        "class"
+      ],
+      [
+        "ThirdPartyVideoService",
+        "+ downloadVideo(id): Video",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        0,
+        1,
+        "assoc"
+      ],
+      [
+        2,
+        1,
+        "real"
+      ],
+      [
+        3,
+        1,
+        "real"
+      ],
+      [
+        2,
+        3,
+        "assoc"
+      ]
+    ],
+    "reuse": "Proxy Pattern_ Access Control Infographic.png",
+    "url": "https://refactoring.guru/design-patterns/proxy"
+  },
+  {
+    "title": "Composite",
+    "category": "Structural",
+    "case": "Boxes containing products and boxes",
+    "desc": "Treat individual objects and recursive groups through one interface.",
+    "problem": "Pricing code distinguishes products from nested boxes repeatedly.",
+    "solution": "A box sums child prices; each child follows the same contract.",
+    "before": "total = 0\nfor item in box.contents:\n    if item is Product: total += item.price\n    else: total += priceNestedBox(item)",
+    "after": "order = new Box([product, innerBox])\ntotal = order.getPrice()\n// leaf and group are both OrderItem",
+    "module": "// Box.getPrice()\ntotal = 0\nfor child in children:\n    total += child.getPrice()\nreturn total",
+    "pnodes": [
+      [
+        "PriceClient",
+        "+ total(box)",
+        1,
+        0,
+        "class"
+      ],
+      [
+        "Product",
+        "+ price: Money",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "Box",
+        "+ contents: List",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "pedges": [
+      [
+        0,
+        1,
+        "dep"
+      ],
+      [
+        0,
+        2,
+        "dep"
+      ]
+    ],
+    "snodes": [
+      [
+        "OrderItem",
+        "+ getPrice(): Money",
+        1,
+        0,
+        "interface"
+      ],
+      [
+        "Product",
+        "- price: Money\n+ getPrice(): Money",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "Box",
+        "- children: OrderItem[0..*]\n+ getPrice(): Money\n+ add(item)",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        1,
+        0,
+        "real"
+      ],
+      [
+        2,
+        0,
+        "real"
+      ],
+      [
+        2,
+        0,
+        "aggregate"
+      ]
+    ],
+    "reuse": "",
+    "url": "https://refactoring.guru/design-patterns/composite"
+  },
+  {
+    "title": "Template Method",
+    "category": "Behavioral",
+    "case": "Mining PDF and CSV documents",
+    "desc": "Fix an algorithm\u2019s order while subclasses implement selected steps.",
+    "problem": "Format-specific miners duplicate the processing and reporting pipeline.",
+    "solution": "Move the sequence into a base method; override extraction only.",
+    "before": "if format == \"pdf\":\n    data = pdf.extract(path)\nelse: data = csv.extract(path)\nreport = analyze(data)",
+    "after": "miner = new PdfMiner()\nreport = miner.mine(path)\n// CsvMiner uses the same pipeline",
+    "module": "// DataMiner.mine(path): fixed sequence\ndata = extract(path)\nreturn analyze(data)\n// PdfMiner.extract(path): return parsePdf(path)",
+    "pnodes": [
+      [
+        "Client",
+        "+ run()",
+        1,
+        0,
+        "class"
+      ],
+      [
+        "PdfMiner",
+        "+ extract(path)\n+ analyze(data)",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "CsvMiner",
+        "+ extract(path)\n+ analyze(data)",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "pedges": [
+      [
+        0,
+        1,
+        "dep"
+      ],
+      [
+        0,
+        2,
+        "dep"
+      ]
+    ],
+    "snodes": [
+      [
+        "DataMiner",
+        "+ mine(path): Report\n# extract(path): Data {abstract}\n# analyze(data): Report",
+        1,
+        0,
+        "abstract"
+      ],
+      [
+        "PdfMiner",
+        "# extract(path): Data",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "CsvMiner",
+        "# extract(path): Data",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        1,
+        0,
+        "gen"
+      ],
+      [
+        2,
+        0,
+        "gen"
+      ]
+    ],
+    "reuse": "",
+    "url": "https://refactoring.guru/design-patterns/template-method"
+  },
+  {
+    "title": "Strategy",
+    "category": "Behavioral",
+    "case": "Navigation route algorithms",
+    "desc": "Make alternative algorithms interchangeable through a shared contract.",
+    "problem": "A navigator grows conditionals for road, walking, and transit routes.",
+    "solution": "Delegate routing to a strategy selected by the client.",
+    "before": "if mode == \"road\": route = roadRoute(a, b)\nelif mode == \"walk\": route = walkRoute(a, b)\nelse: route = transitRoute(a, b)",
+    "after": "navigator.setStrategy(new WalkingRoute())\nroute = navigator.buildRoute(a, b)\n// choose another strategy at runtime",
+    "module": "// Navigator.buildRoute(a, b)\nreturn strategy.buildRoute(a, b)\n// WalkingRoute builds pedestrian paths",
+    "pnodes": [
+      [
+        "Navigator",
+        "- mode: String\n+ buildRoute(a, b): Route",
+        1,
+        1,
+        "class"
+      ]
+    ],
+    "pedges": [],
+    "snodes": [
+      [
+        "Navigator",
+        "- strategy: RouteStrategy\n+ setStrategy(s)\n+ buildRoute(a, b): Route",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "RouteStrategy",
+        "+ buildRoute(a, b): Route",
+        2,
+        0,
+        "interface"
+      ],
+      [
+        "RoadRoute",
+        "+ buildRoute(a, b): Route",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "WalkingRoute",
+        "+ buildRoute(a, b): Route",
+        1,
+        2,
+        "class"
+      ],
+      [
+        "TransitRoute",
+        "+ buildRoute(a, b): Route",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        0,
+        1,
+        "assoc"
+      ],
+      [
+        2,
+        1,
+        "real"
+      ],
+      [
+        3,
+        1,
+        "real"
+      ],
+      [
+        4,
+        1,
+        "real"
+      ]
+    ],
+    "reuse": "",
+    "url": "https://refactoring.guru/design-patterns/strategy"
+  },
+  {
+    "title": "State",
+    "category": "Behavioral",
+    "case": "Document publication workflow",
+    "desc": "Delegate behavior to an object representing the current state.",
+    "problem": "Publication rules accumulate in a switch over document status.",
+    "solution": "Each state handles publish and can transition the document.",
+    "before": "if doc.status == \"draft\":\n    doc.status = \"moderation\"\nelif doc.status == \"moderation\" and user.isAdmin:\n    doc.status = \"published\"",
+    "after": "doc = new Document(new Draft())\ndoc.publish(user)  // enters moderation\ndoc.publish(admin) // becomes published",
+    "module": "// Moderation.publish(doc, user)\nif user.isAdmin:\n    doc.changeState(new Published())\n// Published.publish(...) does nothing",
+    "pnodes": [
+      [
+        "Document",
+        "- status: String\n+ publish(user)",
+        1,
+        1,
+        "class"
+      ]
+    ],
+    "pedges": [],
+    "snodes": [
+      [
+        "Document",
+        "- state: PublicationState\n+ publish(user)\n+ changeState(s)",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "PublicationState",
+        "+ publish(doc, user)",
+        2,
+        0,
+        "interface"
+      ],
+      [
+        "Draft",
+        "+ publish(doc, user)",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "Moderation",
+        "+ publish(doc, user)",
+        1,
+        2,
+        "class"
+      ],
+      [
+        "Published",
+        "+ publish(doc, user)",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        0,
+        1,
+        "assoc"
+      ],
+      [
+        2,
+        1,
+        "real"
+      ],
+      [
+        3,
+        1,
+        "real"
+      ],
+      [
+        4,
+        1,
+        "real"
+      ]
+    ],
+    "reuse": "",
+    "url": "https://refactoring.guru/design-patterns/state"
+  },
+  {
+    "title": "Observer",
+    "category": "Behavioral",
+    "case": "Editor events notify logging and email",
+    "desc": "Notify registered subscribers when a publisher emits an event.",
+    "problem": "Editor logic directly invokes concrete logging and email services.",
+    "solution": "Publish an event; subscribers handle their own reactions.",
+    "before": "editor.saveFile()\nlogger.write(file.name)\nmailer.send(file.name)\n// client must wire every reaction",
+    "after": "events.subscribe(\"save\", new LogListener())\nevents.subscribe(\"save\", new EmailListener())\neditor.saveFile() // emits save event",
+    "module": "// EventManager.notify(type, data)\nfor listener in listeners[type]:\n    listener.update(data)\n// Editor.saveFile(): write(); events.notify(\"save\", name)",
+    "pnodes": [
+      [
+        "Editor",
+        "+ saveFile()",
+        1,
+        0,
+        "class"
+      ],
+      [
+        "Logger",
+        "+ write(name)",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "Mailer",
+        "+ send(name)",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "pedges": [
+      [
+        0,
+        1,
+        "dep"
+      ],
+      [
+        0,
+        2,
+        "dep"
+      ]
+    ],
+    "snodes": [
+      [
+        "Editor",
+        "- events: EventManager\n+ saveFile()",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "EventManager",
+        "- listeners: EventListener[0..*]\n+ subscribe(type, listener)\n+ unsubscribe(type, listener)\n+ notify(type, data)",
+        1,
+        1,
+        "class"
+      ],
+      [
+        "EventListener",
+        "+ update(data)",
+        2,
+        0,
+        "interface"
+      ],
+      [
+        "LogListener",
+        "+ update(data)",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "EmailListener",
+        "+ update(data)",
+        2,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        0,
+        1,
+        "assoc"
+      ],
+      [
+        1,
+        2,
+        "assoc"
+      ],
+      [
+        3,
+        2,
+        "real"
+      ],
+      [
+        4,
+        2,
+        "real"
+      ]
+    ],
+    "reuse": "",
+    "url": "https://refactoring.guru/design-patterns/observer"
+  },
+  {
+    "title": "Command",
+    "category": "Behavioral",
+    "case": "Undoable text-editor actions",
+    "desc": "Represent a request as an object that can be invoked and undone.",
+    "problem": "Buttons and shortcuts duplicate editing actions without shared undo.",
+    "solution": "Bind both triggers to a command; store successful edits in history.",
+    "before": "pasteButton.onClick(() => editor.insert(text))\nshortcut.onPress(() => editor.insert(text))\n// duplicated action; no undo record",
+    "after": "paste = new PasteCommand(editor, text)\npasteButton.bind(() => app.execute(paste))\nshortcut.bind(() => app.execute(paste))\napp.undo()",
+    "module": "// PasteCommand.execute()\nbackup = editor.text; editor.insert(text)\nreturn true  // app records command in history\n// undo(): editor.text = backup",
+    "pnodes": [
+      [
+        "PasteButton",
+        "+ click()",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "Shortcut",
+        "+ press()",
+        2,
+        0,
+        "class"
+      ],
+      [
+        "Editor",
+        "+ insert(text)",
+        1,
+        2,
+        "class"
+      ]
+    ],
+    "pedges": [
+      [
+        0,
+        2,
+        "dep"
+      ],
+      [
+        1,
+        2,
+        "dep"
+      ]
+    ],
+    "snodes": [
+      [
+        "Application",
+        "- history: Command[*]\n+ execute(command)\n+ undo()",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "Command",
+        "+ execute(): Boolean\n+ undo()",
+        2,
+        0,
+        "interface"
+      ],
+      [
+        "PasteCommand",
+        "- editor: Editor\n- backup: String\n+ execute(): Boolean\n+ undo()",
+        2,
+        2,
+        "class"
+      ],
+      [
+        "Editor",
+        "+ text: String\n+ insert(text)",
+        0,
+        2,
+        "class"
+      ]
+    ],
+    "sedges": [
+      [
+        0,
+        1,
+        "assoc"
+      ],
+      [
+        2,
+        1,
+        "real"
+      ],
+      [
+        2,
+        3,
+        "assoc"
+      ]
+    ],
+    "reuse": "",
+    "url": "https://refactoring.guru/design-patterns/command"
+  }
+]
