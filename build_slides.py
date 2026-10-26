@@ -25,8 +25,8 @@ add('Singleton','Creational','Shared database connection',
 
 add('Factory Method','Creational','Road and sea logistics',
 'Let creator subclasses choose the product used by shared business logic.',
-'Logistics directly constructs trucks; sea delivery forces edits.', 'Override a creation method while preserving delivery planning.',
-'truck = new Truck()\ntruck.deliver()\n// sea support needs another branch',
+'Logistics constructs concrete transports; each new kind forces edits.', 'Override a creation method while preserving delivery planning.',
+'truck = new Truck()\nship = new Ship()\ntruck.deliver()\n// every new kind edits Logistics',
 'logistics = new SeaLogistics()\nlogistics.planDelivery()\n// planning uses Transport',
 '// Logistics.planDelivery()\nvehicle = createTransport()\nvehicle.deliver()\n// SeaLogistics.createTransport(): return new Ship()',
 [n('Logistics','+ planDelivery()',0,0),n('Truck','+ deliver()',2,1)],[(0,1,'dep')],
@@ -143,124 +143,341 @@ add('Command','Behavioral','Undoable text-editor actions',
 # UML rendering: ordinary three-compartment classes, interface stereotypes,
 # hollow generalization/realization triangles, open dependencies, navigable
 # associations, and hollow aggregation at the whole (Box) end.
+# Layout rule: place sibling subclasses side-by-side under their parent so
+# inheritance uses short vertical arrows (sample / refactoring.guru style).
 INK='#172B4D'; BLUE='#1662C4'; RED='#B14747'; GREEN='#13746A'
 def uml(nodes,edges,path):
-    buf=io.BytesIO(); c=canvas.Canvas(buf,pagesize=(660,270))
-    boxes=[]
-    for name,members,col,row,kind in nodes:
-        x=7+col*220; y=260-row*87
-        lines=members.split('\n'); h=30+len(lines)*11
-        boxes.append((x,y,206,h))
-    def anchor(a,b):
-        x,y,w,h=a; X,Y,W,H=b; dx=(X+W/2)-(x+w/2); dy=(Y-H/2)-(y-h/2)
-        if abs(dx)>abs(dy)*1.4: return (x+w if dx>0 else x,y-h/2),(X if dx>0 else X+W,Y-H/2)
-        return (x+w/2,y-h if dy<0 else y),(X+W/2,Y if dy<0 else Y-H)
     import heapq
-    def route(a,b,ai,bi):
-        # Orthogonal visibility graph: box exteriors are obstacles, including
-        # the endpoint classes. Short outward stubs keep arrowheads clear.
-        def stub(point,box):
-            x,y,w,h=box; px,py=point
-            if px==x:return (px-6,py)
-            if px==x+w:return (px+6,py)
-            if py==y:return (px,py+6)
-            return (px,py-6)
-        aa=stub(a,boxes[ai]);bb=stub(b,boxes[bi])
-        xs={0,660,a[0],b[0],aa[0],bb[0]};ys={0,270,a[1],b[1],aa[1],bb[1]}
+    CW,CH=660,270
+    buf=io.BytesIO(); c=canvas.Canvas(buf,pagesize=(CW,CH))
+    cols=sorted({float(n[2]) for n in nodes})
+    span=(max(cols)-min(cols)+1) if cols else 1
+    pitch=min(220,(CW-20)/span)
+    box_w=min(198,pitch-16)
+    max_row=max(float(n[3]) for n in nodes) or 1
+    row_pitch=(CH-28)/(max_row+0.9)
+    boxes=[]; centers=[]
+    for name,members,col,row,kind in nodes:
+        x=10+float(col)*pitch+(pitch-box_w)/2
+        h=28+len(members.split('\n'))*11
+        y=CH-14-float(row)*row_pitch
+        boxes.append((x,y,box_w,h)); centers.append((x+box_w/2,y-h/2))
+    MARGIN=7
+    def inflate(box,m=MARGIN):
+        x,y,w,h=box; return (x-m,y+m,w+2*m,h+2*m)
+    def segment_hits(u,v,ignore=()):
+        for i,box in enumerate(boxes):
+            if i in ignore: continue
+            x,y,w,h=inflate(box)
+            if abs(u[0]-v[0])<0.01:
+                if x<u[0]<x+w and max(min(u[1],v[1]),y-h)<min(max(u[1],v[1]),y): return True
+            else:
+                if y-h<u[1]<y and max(min(u[0],v[0]),x)<min(max(u[0],v[0]),x+w): return True
+        return False
+    def clear_path(pts,ignore=()):
+        return all(not segment_hits(u,v,ignore) for u,v in zip(pts,pts[1:]))
+    def stub(point,box,dist=9):
+        x,y,w,h=box; px,py=point
+        if abs(px-x)<0.5: return (px-dist,py)
+        if abs(px-(x+w))<0.5: return (px+dist,py)
+        if abs(py-y)<0.5: return (px,py+dist)
+        return (px,py-dist)
+    def top_anchor(box,frac=0.5):
+        x,y,w,h=box; return (x+w*frac,y)
+    def bottom_anchor(box,frac=0.5):
+        x,y,w,h=box; return (x+w*frac,y-h)
+    def side_anchor(box,toward_x):
+        x,y,w,h=box
+        return (x+w if toward_x>=x+w/2 else x, y-h/2)
+    def simplify(pts):
+        clean=[]
+        for pt in pts:
+            pt=(round(pt[0],1),round(pt[1],1))
+            if clean and clean[-1]==pt: continue
+            while len(clean)>1 and ((clean[-2][0]==clean[-1][0]==pt[0]) or (clean[-2][1]==clean[-1][1]==pt[1])):
+                clean.pop()
+            clean.append(pt)
+        return clean
+    def pick_anchors(ai,bi,t):
+        A,B=boxes[ai],boxes[bi]
+        ax,ay=centers[ai]; bx,by=centers[bi]
+        if t=='aggregate':
+            return (A[0]+A[2],ay),(B[0]+B[2],by)
+        # Inheritance / realization: child below parent, arrow into parent bottom.
+        if t in ('gen','real') and by>=ay-8:
+            siblings=[i for i,j,tt in edges if j==bi and tt in ('gen','real')]
+            if len(siblings)>1 and ai in siblings:
+                idx=siblings.index(ai); n=len(siblings)
+                frac=0.30+0.40*(idx/(n-1))
+            else:
+                frac=0.5
+            return top_anchor(A,0.5), bottom_anchor(B,frac)
+        # Sample-style tree: parent above children uses bottom → top anchors
+        # (Factory before diagram: Logistics down to Truck / Ship).
+        if ay>by+20 and abs(ax-bx)>8:
+            siblings=[i for i,j,tt in edges if i==ai and tt==t and centers[j][1]<ay-10]
+            frac=0.5
+            if len(siblings)>1 and bi in siblings:
+                idx=siblings.index(bi); n=len(siblings)
+                frac=0.28+0.44*(idx/(n-1))
+            return bottom_anchor(A,frac), top_anchor(B,0.5)
+        if abs(ay-by)*1.15<=abs(ax-bx):
+            return ((A[0]+A[2],ay) if ax<bx else (A[0],ay),
+                    (B[0],by) if ax<bx else (B[0]+B[2],by))
+        return ((bottom_anchor(A) if ay>by else top_anchor(A)),
+                (top_anchor(B) if ay>by else bottom_anchor(B)))
+    def try_routes(a,b,ai,bi):
+        A,B=boxes[ai],boxes[bi]
+        ax,ay=centers[ai]; bx,by=centers[bi]
+        candidates=[]
+        if abs(a[0]-b[0])<14:
+            x=round((a[0]+b[0])/2,1)
+            candidates.append([(x,a[1]),(x,b[1])])
+        if abs(a[1]-b[1])<14:
+            y=round((a[1]+b[1])/2,1)
+            candidates.append([(a[0],y),(b[0],y)])
+        # Inverted-T / sample tree: drop from parent, run a shared bus, drop to child top.
+        if ay>by+16:
+            bus_y=round((a[1]+b[1])/2,1)
+            candidates.append([a,(a[0],bus_y),(b[0],bus_y),b])
+            candidates.insert(0,[a,(a[0],bus_y),(b[0],bus_y),b])
+        candidates.append([a,(b[0],a[1]),b])
+        candidates.append([a,(a[0],b[1]),b])
+        for gut_x in (A[0]-12, A[0]+A[2]+12, B[0]-12, B[0]+B[2]+12, (ax+bx)/2):
+            gut_x=max(6,min(CW-6,gut_x))
+            lift=10 if a[1]<b[1] else -10
+            candidates.append([a,(a[0],a[1]+lift),(gut_x,a[1]+lift),(gut_x,b[1]),b])
+            candidates.append([a,(gut_x,a[1]),(gut_x,b[1]),b])
+        # Prefer routing above the top of both boxes so mid-row neighbors are not crossed.
+        over=max(A[1],B[1])+16
+        if over<CH-4:
+            candidates.append([a,(a[0],over),(b[0],over),b])
+        under=min(A[1]-A[3],B[1]-B[3])-16
+        if under>4:
+            candidates.append([a,(a[0],under),(b[0],under),b])
+        for gut_y in (A[1]+12, A[1]-A[3]-12, B[1]+12, B[1]-B[3]-12, (ay+by)/2):
+            gut_y=max(6,min(CH-6,gut_y))
+            candidates.append([a,(a[0],gut_y),(b[0],gut_y),b])
+        if by>ay:
+            # Prefer the gutter toward open space (right first) so stacked children
+            # do not wrap around the far left border of the diagram.
+            gutters=[A[0]+A[2]+14]
+            # If a neighboring box sits to the right, aim for the channel between them.
+            for j,Bb in enumerate(boxes):
+                if j in (ai,bi): continue
+                if Bb[0]>A[0]+A[2]-2 and abs((Bb[1]-Bb[3]/2)-(ay))<row_pitch:
+                    gutters.insert(0,(A[0]+A[2]+Bb[0])/2)
+            gutters.append(A[0]-14)
+            for gut_x in gutters:
+                gut_x=max(6,min(CW-6,gut_x))
+                lift=min(A[1]+12, (ay+by)/2)
+                bus=max(B[1]-B[3]-14, lift+8)
+                candidates.append([a,(a[0],lift),(gut_x,lift),(gut_x,bus),(b[0],bus),b])
+                ps=side_anchor(B,gut_x)
+                candidates.append([a,(a[0],lift),(gut_x,lift),(gut_x,ps[1]),ps])
+        scored=[]
+        for pts in candidates:
+            pts=simplify(pts)
+            if len(pts)<2: continue
+            if not all(abs(u[0]-v[0])<0.01 or abs(u[1]-v[1])<0.01 for u,v in zip(pts,pts[1:])): continue
+            if not clear_path(pts,ignore={ai,bi}): continue
+            bends=max(0,len(pts)-2)
+            length=sum(abs(u[0]-v[0])+abs(u[1]-v[1]) for u,v in zip(pts,pts[1:]))
+            scored.append((bends,length,pts))
+        if scored:
+            scored.sort(); return scored[0][2]
+        return None
+    def route_astar(a,b,ai,bi):
+        aa=stub(a,boxes[ai]); bb=stub(b,boxes[bi])
+        xs={0,CW,a[0],b[0],aa[0],bb[0]}; ys={0,CH,a[1],b[1],aa[1],bb[1]}
         for x,y,w,h in boxes:
-            xs.update((x-6,x+w+6,x+w/2));ys.update((y+6,y-h-6,y-h/2))
-        xs=sorted(v for v in xs if 0<=v<=660);ys=sorted(v for v in ys if 0<=v<=270)
+            xs.update((x-MARGIN-4,x+w+MARGIN+4,x-14,x+w+14,x+w/2))
+            ys.update((y+MARGIN+4,y-h-MARGIN-4,y+14,y-h-14,y-h/2))
+        xs=sorted({round(v,1) for v in xs if 0<=v<=CW})
+        ys=sorted({round(v,1) for v in ys if 0<=v<=CH})
         def clear(u,v):
-            for x,y,w,h in boxes:
-                if u[0]==v[0]:
-                    if x-2<u[0]<x+w+2 and max(min(u[1],v[1]),y-h-2)<min(max(u[1],v[1]),y+2):return False
-                else:
-                    if y-h-2<u[1]<y+2 and max(min(u[0],v[0]),x-2)<min(max(u[0],v[0]),x+w+2):return False
-            return True
-        initial=(xs.index(aa[0]),ys.index(aa[1]),-1)
-        target=(xs.index(bb[0]),ys.index(bb[1]))
-        queue=[(0,0,initial)];cost={initial:0};prev={};finish=None
+            return not segment_hits(u,v,ignore={ai,bi})
+        def near(val,axis):
+            grid=xs if axis=='x' else ys
+            return min(range(len(grid)), key=lambda i: abs(grid[i]-val))
+        initial=(near(aa[0],'x'),near(aa[1],'y'),-1)
+        target=(near(bb[0],'x'),near(bb[1],'y'))
+        queue=[(0,0,initial)]; cost={initial:0}; prev={}; finish=None
         while queue:
             _,g,state=heapq.heappop(queue)
-            if g!=cost[state]:continue
+            if g!=cost[state]: continue
             xi,yi,last=state
-            if (xi,yi)==target:finish=state;break
-            for dx,dy,direction in [(1,0,0),(-1,0,0),(0,1,1),(0,-1,1)]:
+            if (xi,yi)==target: finish=state; break
+            for dx,dy,direction in ((1,0,0),(-1,0,0),(0,1,1),(0,-1,1)):
                 nx,ny=xi+dx,yi+dy
-                if not (0<=nx<len(xs) and 0<=ny<len(ys)):continue
-                u=(xs[xi],ys[yi]);v=(xs[nx],ys[ny])
-                if not clear(u,v):continue
-                ng=g+abs(u[0]-v[0])+abs(u[1]-v[1])+(14 if last not in (-1,direction) else 0)
+                if not (0<=nx<len(xs) and 0<=ny<len(ys)): continue
+                u=(xs[xi],ys[yi]); v=(xs[nx],ys[ny])
+                if not clear(u,v): continue
+                ng=g+abs(u[0]-v[0])+abs(u[1]-v[1])+(20 if last not in (-1,direction) else 0)
                 nxt=(nx,ny,direction)
                 if ng<cost.get(nxt,float('inf')):
-                    cost[nxt]=ng;prev[nxt]=state
+                    cost[nxt]=ng; prev[nxt]=state
                     heur=abs(v[0]-bb[0])+abs(v[1]-bb[1])
                     heapq.heappush(queue,(ng+heur,ng,nxt))
-        if finish is None:raise RuntimeError('No UML route found')
-        path=[];cur=finish
-        while cur!=initial:path.append((xs[cur[0]],ys[cur[1]]));cur=prev[cur]
-        path=[a,aa]+list(reversed(path))+[b]
-        clean=[]
-        for pt in path:
-            if clean and clean[-1]==pt:continue
-            while len(clean)>1 and ((clean[-2][0]==clean[-1][0]==pt[0]) or (clean[-2][1]==clean[-1][1]==pt[1])):clean.pop()
-            clean.append(pt)
-        assert all(u[0]==v[0] or u[1]==v[1] for u,v in zip(clean,clean[1:])), 'Non-orthogonal edge'
-        return clean
-    c.setStrokeColor(HexColor('#17212E')); c.setLineWidth(1.9)
-    c.setLineJoin(0)
+        if finish is None: raise RuntimeError('No UML route found')
+        pts=[]; cur=finish
+        while cur!=initial:
+            pts.append((xs[cur[0]],ys[cur[1]])); cur=prev[cur]
+        return simplify([a,aa]+list(reversed(pts))+[bb,b])
+    def join_orthogonal(a,pts,b):
+        # Force end caps onto the chosen anchors with HV/VH stubs only.
+        if not pts:
+            if abs(a[0]-b[0])<0.01 or abs(a[1]-b[1])<0.01: return [a,b]
+            return [a,(b[0],a[1]),b]
+        mid=list(pts)
+        if mid[0]!=a:
+            if abs(a[0]-mid[0][0])>0.01 and abs(a[1]-mid[0][1])>0.01:
+                mid=[(a[0],mid[0][1])]+mid if abs(a[1]-mid[0][1])<=abs(a[0]-mid[0][0]) else [(mid[0][0],a[1])]+mid
+            mid=[a]+mid
+        if mid[-1]!=b:
+            if abs(b[0]-mid[-1][0])>0.01 and abs(b[1]-mid[-1][1])>0.01:
+                mid=mid+[(b[0],mid[-1][1])] if abs(b[1]-mid[-1][1])<=abs(b[0]-mid[-1][0]) else mid+[(mid[-1][0],b[1])]
+            mid=mid+[b]
+        return simplify(mid)
+    def route(a,b,ai,bi):
+        simple=try_routes(a,b,ai,bi)
+        if simple is not None:
+            return join_orthogonal(a,simple,b)
+        return join_orthogonal(a,route_astar(a,b,ai,bi),b)
+    c.setStrokeColor(HexColor('#17212E')); c.setLineWidth(1.9); c.setLineJoin(0)
     for ai,bi,t in edges:
-        a,b=anchor(boxes[ai],boxes[bi])
-        if t=='aggregate':
-            ax,ay,aw,ah=boxes[ai];bx,by,bw,bh=boxes[bi]
-            a=(ax+aw,ay-ah/2);b=(bx+bw,by-bh/2)
+        a,b=pick_anchors(ai,bi,t)
         points=route(a,b,ai,bi)
-        dx=b[0]-points[-2][0];dy=b[1]-points[-2][1];length=math.hypot(dx,dy) or 1; ux,uy=dx/length,dy/length; vx,vy=-uy,ux
+        if not all(abs(u[0]-v[0])<0.01 or abs(u[1]-v[1])<0.01 for u,v in zip(points,points[1:])):
+            points=join_orthogonal(a,[],b)
+        assert all(abs(u[0]-v[0])<0.01 or abs(u[1]-v[1])<0.01 for u,v in zip(points,points[1:])), (a,b,points)
+        dx=b[0]-points[-2][0]; dy=b[1]-points[-2][1]
+        length=math.hypot(dx,dy) or 1; ux,uy=dx/length,dy/length; vx,vy=-uy,ux
         c.setDash(6,3) if t in ('dep','real') else c.setDash()
-        for pa,pb in zip(points,points[1:]):c.line(*pa,*pb)
+        for pa,pb in zip(points,points[1:]): c.line(*pa,*pb)
         c.setDash()
         if t in ('gen','real'):
-            p=c.beginPath();p.moveTo(*b);p.lineTo(b[0]-12*ux+5*vx,b[1]-12*uy+5*vy);p.lineTo(b[0]-12*ux-5*vx,b[1]-12*uy-5*vy);p.close();c.setFillColor(white);c.drawPath(p,fill=1,stroke=1)
+            tip=(b[0]-2*ux,b[1]-2*uy)
+            p=c.beginPath(); p.moveTo(*tip)
+            p.lineTo(tip[0]-12*ux+5.5*vx,tip[1]-12*uy+5.5*vy)
+            p.lineTo(tip[0]-12*ux-5.5*vx,tip[1]-12*uy-5.5*vy); p.close()
+            c.setFillColor(white); c.drawPath(p,fill=1,stroke=1)
         elif t=='aggregate':
-            dx=points[1][0]-a[0];dy=points[1][1]-a[1];length=math.hypot(dx,dy) or 1;ux,uy=dx/length,dy/length;vx,vy=-uy,ux
-            p=c.beginPath();p.moveTo(*a);p.lineTo(a[0]+6*ux+3*vx,a[1]+6*uy+3*vy);p.lineTo(a[0]+12*ux,a[1]+12*uy);p.lineTo(a[0]+6*ux-3*vx,a[1]+6*uy-3*vy);p.close();c.setFillColor(white);c.drawPath(p,fill=1,stroke=1)
-            c.setFont('Helvetica',8);c.drawString(b[0]+5,b[1]-12,'0..*')
+            dx=points[1][0]-a[0]; dy=points[1][1]-a[1]; length=math.hypot(dx,dy) or 1
+            ux,uy=dx/length,dy/length; vx,vy=-uy,ux
+            p=c.beginPath(); p.moveTo(*a)
+            p.lineTo(a[0]+6*ux+3*vx,a[1]+6*uy+3*vy); p.lineTo(a[0]+12*ux,a[1]+12*uy)
+            p.lineTo(a[0]+6*ux-3*vx,a[1]+6*uy-3*vy); p.close()
+            c.setFillColor(white); c.drawPath(p,fill=1,stroke=1)
+            c.setFont('Helvetica',8); c.drawString(b[0]+5,b[1]-12,'0..*')
         else:
-            c.line(*b,b[0]-11*ux+4.5*vx,b[1]-11*uy+4.5*vy);c.line(*b,b[0]-11*ux-4.5*vx,b[1]-11*uy-4.5*vy)
+            c.line(*b,b[0]-11*ux+4.5*vx,b[1]-11*uy+4.5*vy)
+            c.line(*b,b[0]-11*ux-4.5*vx,b[1]-11*uy-4.5*vy)
     c.setLineWidth(1.25)
     for (name,members,col,row,kind),(x,y,w,h) in zip(nodes,boxes):
-        c.setFillColor(white);c.rect(x,y-h,w,h,fill=1,stroke=1)
-        c.setFillColor(HexColor('#DFE5F0' if kind=='interface' else '#EBEEF4'));c.rect(x,y-20,w,20,fill=1,stroke=0)
-        c.setFillColor(HexColor(INK));c.setFont('Helvetica-Oblique' if kind=='abstract' else 'Helvetica-Bold',10)
+        c.setFillColor(white); c.rect(x,y-h,w,h,fill=1,stroke=1)
+        c.setFillColor(HexColor('#DFE5F0' if kind=='interface' else '#EBEEF4'))
+        c.rect(x,y-20,w,20,fill=1,stroke=0)
+        c.setStrokeColor(HexColor('#17212E')); c.line(x,y-20,x+w,y-20)
         label=('<<interface>> ' if kind=='interface' else '')+name
-        c.setFont('Helvetica-BoldOblique' if kind=='abstract' else 'Helvetica-Bold',min(10,190/(max(len(label),1)*.54)))
-        c.drawCentredString(x+w/2,y-13,label);c.line(x,y-20,x+w,y-20)
-        attrs=[s for s in members.split('\n') if '(' not in s];ops=[s for s in members.split('\n') if '(' in s]
-        yy=y-31;c.setFont('Courier',8.7)
-        for s in attrs: c.drawString(x+5,yy,s);yy-=11
+        c.setFillColor(HexColor(INK))
+        c.setFont('Helvetica-BoldOblique' if kind=='abstract' else 'Helvetica-Bold',
+                  min(10,(w-10)/(max(len(label),1)*.54)))
+        c.drawCentredString(x+w/2,y-13,label)
+        attrs=[s for s in members.split('\n') if '(' not in s]
+        ops=[s for s in members.split('\n') if '(' in s]
+        yy=y-31; c.setFont('Courier',8.5)
+        for s in attrs: c.drawString(x+5,yy,s); yy-=11
         c.line(x,yy+6,x+w,yy+6)
         for s in ops:
-            size=min(8.7,195/(len(s)*.6));c.setFont('Courier',size);c.drawString(x+5,yy-4,s)
-            if '{static}' in s: c.line(x+5,yy-6,x+5+pdfmetrics.stringWidth(s,'Courier',size),yy-6)
+            size=min(8.5,(w-12)/(max(len(s),1)*.55)); c.setFont('Courier',size)
+            c.drawString(x+5,yy-4,s)
+            if '{static}' in s:
+                c.line(x+5,yy-6,x+5+pdfmetrics.stringWidth(s,'Courier',size),yy-6)
             yy-=11
-    c.save(); doc=pymupdf.open(stream=buf.getvalue(),filetype='pdf');doc[0].get_pixmap(matrix=pymupdf.Matrix(2,2)).save(path)
+    c.save()
+    doc=pymupdf.open(stream=buf.getvalue(),filetype='pdf')
+    doc[0].get_pixmap(matrix=pymupdf.Matrix(2,2)).save(path)
 
-def expand_group(nodes,edges):
-    # Group labels in compact source become separate concrete UML classes.
-    nodes=list(nodes);edges=list(edges)
-    for i in range(len(nodes)):
-        name,mem,col,row,kind=nodes[i]
-        if ' / ' in name:
-            a,b=name.split(' / ');nodes[i]=(a,mem,col,row,kind)
-            # split within the same visual slot using a half-column offset
-            nodes[i]=(a,mem,col,row,kind)
-            # Kept as two classes by render-time geometry override below.
-    return nodes,edges
-
-# Replace compact grouped nodes with separate classes and roomier layouts.
-d=DATA[1];d['snodes']=[n('Logistics','+ planDelivery()\n+ createTransport(): Transport',0,0,'abstract'),n('Transport','+ deliver()',2,0,'interface'),n('RoadLogistics','+ createTransport(): Transport',0,1),n('SeaLogistics','+ createTransport(): Transport',0,2),n('Truck','+ deliver()',2,1),n('Ship','+ deliver()',2,2)];d['sedges']=[(2,0,'gen'),(3,0,'gen'),(0,1,'dep'),(4,1,'real'),(5,1,'real')]
-d=DATA[5];d['snodes']=[n('Shape','- color: Color\n+ draw() {abstract}',0,0,'abstract'),n('Color','+ apply()',2,0,'interface'),n('Circle','+ draw()',0,1),n('Square','+ draw()',0,2),n('Red','+ apply()',2,1),n('Blue','+ apply()',2,2)];d['sedges']=[(0,1,'assoc'),(2,0,'gen'),(3,0,'gen'),(4,1,'real'),(5,1,'real')]
-d=DATA[2];d['snodes']=[n('FurnitureFactory','+ createChair(): Chair\n+ createSofa(): Sofa',0,0,'interface'),n('ModernFactory','+ createChair(): Chair\n+ createSofa(): Sofa',0,1),n('VictorianFactory','+ createChair(): Chair\n+ createSofa(): Sofa',0,2),n('Chair','+ sitOn()',1,0,'interface'),n('Sofa','+ lieOn()',2,0,'interface'),n('ModernChair','+ sitOn()',1,1),n('VictorianChair','+ sitOn()',1,2),n('ModernSofa','+ lieOn()',2,1),n('VictorianSofa','+ lieOn()',2,2)];d['sedges']=[(1,0,'real'),(2,0,'real'),(5,3,'real'),(6,3,'real'),(7,4,'real'),(8,4,'real')]
+# Sample-style layouts: siblings share a row under their parent.
+# Factory Method — before matches sample (client to concretes); after is creator/product trees.
+d=DATA[1]
+d['pnodes']=[n('Logistics','+ planDelivery()',1,0),n('Truck','+ deliver()',0,1),n('Ship','+ deliver()',2,1)]
+d['pedges']=[(0,1,'dep'),(0,2,'dep')]
+d['snodes']=[
+    n('Logistics','+ planDelivery()\n+ createTransport(): Transport',0.5,0,'abstract'),
+    n('Transport','+ deliver()',2.5,0,'interface'),
+    n('RoadLogistics','+ createTransport(): Transport',0,1),
+    n('SeaLogistics','+ createTransport(): Transport',1,1),
+    n('Truck','+ deliver()',2,1),
+    n('Ship','+ deliver()',3,1)]
+d['sedges']=[(2,0,'gen'),(3,0,'gen'),(0,1,'dep'),(4,1,'real'),(5,1,'real')]
+# Abstract Factory — website furniture families; every sibling pair sits side-by-side
+# under its interface (same organization as the local abstractfactory.png sample).
+d=DATA[2]
+d['pnodes']=[n('Shop','+ furnish()',1,0),n('ModernChair','+ sitOn()',0,1),n('VictorianSofa','+ lieOn()',2,1)]
+d['pedges']=[(0,1,'dep'),(0,2,'dep')]
+d['snodes']=[
+    n('FurnitureFactory','+ createChair(): Chair\n+ createSofa(): Sofa',0.5,0,'interface'),
+    n('ModernFactory','+ createChair(): Chair\n+ createSofa(): Sofa',0,1),
+    n('VictorianFactory','+ createChair(): Chair\n+ createSofa(): Sofa',1,1),
+    n('Chair','+ sitOn()',2.5,0,'interface'),
+    n('ModernChair','+ sitOn()',2,1),
+    n('VictorianChair','+ sitOn()',3,1),
+    n('Sofa','+ lieOn()',4.5,0,'interface'),
+    n('ModernSofa','+ lieOn()',4,1),
+    n('VictorianSofa','+ lieOn()',5,1)]
+d['sedges']=[(1,0,'real'),(2,0,'real'),(4,3,'real'),(5,3,'real'),(7,6,'real'),(8,6,'real')]
+# Bridge — shape and color hierarchies side-by-side under each root.
+d=DATA[5]
+d['snodes']=[
+    n('Shape','- color: Color\n+ draw() {abstract}',0.5,0,'abstract'),
+    n('Color','+ apply()',2.5,0,'interface'),
+    n('Circle','+ draw()',0,1),
+    n('Square','+ draw()',1,1),
+    n('Red','+ apply()',2,1),
+    n('Blue','+ apply()',3,1)]
+d['sedges']=[(0,1,'assoc'),(2,0,'gen'),(3,0,'gen'),(4,1,'real'),(5,1,'real')]
+# Adapter — vertical interface stack; library beside the adapter (sample style).
+d=DATA[4]
+d['snodes']=[
+    n('StockApplication','- analytics: AnalyticsService\n+ analyzeStocks()',0,0),
+    n('AnalyticsService','+ analyze(xml): Report',2,0,'interface'),
+    n('XmlAnalyticsAdapter','- library: JsonAnalyticsLibrary\n+ analyze(xml): Report',2,1),
+    n('JsonAnalyticsLibrary','+ analyze(json): Report',0,1)]
+d['sedges']=[(0,1,'assoc'),(2,1,'real'),(2,3,'assoc')]
+# Proxy — interface on top; proxy and real service side-by-side (sample style).
+d=DATA[7]
+d['snodes']=[
+    n('VideoManager','- service: VideoService\n+ play(id)',0,0),
+    n('VideoService','+ downloadVideo(id): Video',1.5,0,'interface'),
+    n('CachedVideoProxy','- real: VideoService\n- cache: Map\n+ downloadVideo(id): Video',0.5,1),
+    n('ThirdPartyVideoService','+ downloadVideo(id): Video',2.5,1)]
+d['sedges']=[(0,1,'assoc'),(2,1,'real'),(3,1,'real'),(2,3,'assoc')]
+# Strategy / State — concrete strategies share one row under the interface.
+d=DATA[10]
+d['snodes']=[
+    n('Navigator','- strategy: RouteStrategy\n+ setStrategy(s)\n+ buildRoute(a, b): Route',0,0),
+    n('RouteStrategy','+ buildRoute(a, b): Route',2,0,'interface'),
+    n('RoadRoute','+ buildRoute(a, b): Route',1,1),
+    n('WalkingRoute','+ buildRoute(a, b): Route',2,1),
+    n('TransitRoute','+ buildRoute(a, b): Route',3,1)]
+d['sedges']=[(0,1,'assoc'),(2,1,'real'),(3,1,'real'),(4,1,'real')]
+d=DATA[11]
+d['snodes']=[
+    n('Document','- state: PublicationState\n+ publish(user)\n+ changeState(s)',0,0),
+    n('PublicationState','+ publish(doc, user)',2,0,'interface'),
+    n('Draft','+ publish(doc, user)',1,1),
+    n('Moderation','+ publish(doc, user)',2,1),
+    n('Published','+ publish(doc, user)',3,1)]
+d['sedges']=[(0,1,'assoc'),(2,1,'real'),(3,1,'real'),(4,1,'real')]
+# Template Method — subclasses side-by-side under the abstract miner.
+d=DATA[9]
+d['snodes']=[
+    n('DataMiner','+ mine(path): Report\n# extract(path): Data {abstract}\n# analyze(data): Report',1,0,'abstract'),
+    n('PdfMiner','# extract(path): Data',0,1),
+    n('CsvMiner','# extract(path): Data',2,1)]
+d['sedges']=[(1,0,'gen'),(2,0,'gen')]
 
 def wrap(text,font,size,width):
     result=[]

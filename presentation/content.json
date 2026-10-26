@@ -63,21 +63,28 @@
     "category": "Creational",
     "case": "Road and sea logistics",
     "desc": "Let creator subclasses choose the product used by shared business logic.",
-    "problem": "Logistics directly constructs trucks; sea delivery forces edits.",
+    "problem": "Logistics constructs concrete transports; each new kind forces edits.",
     "solution": "Override a creation method while preserving delivery planning.",
-    "before": "truck = new Truck()\ntruck.deliver()\n// sea support needs another branch",
+    "before": "truck = new Truck()\nship = new Ship()\ntruck.deliver()\n// every new kind edits Logistics",
     "after": "logistics = new SeaLogistics()\nlogistics.planDelivery()\n// planning uses Transport",
     "module": "// Logistics.planDelivery()\nvehicle = createTransport()\nvehicle.deliver()\n// SeaLogistics.createTransport(): return new Ship()",
     "pnodes": [
       [
         "Logistics",
         "+ planDelivery()",
-        0,
+        1,
         0,
         "class"
       ],
       [
         "Truck",
+        "+ deliver()",
+        0,
+        1,
+        "class"
+      ],
+      [
+        "Ship",
         "+ deliver()",
         2,
         1,
@@ -89,20 +96,25 @@
         0,
         1,
         "dep"
+      ],
+      [
+        0,
+        2,
+        "dep"
       ]
     ],
     "snodes": [
       [
         "Logistics",
         "+ planDelivery()\n+ createTransport(): Transport",
-        0,
+        0.5,
         0,
         "abstract"
       ],
       [
         "Transport",
         "+ deliver()",
-        2,
+        2.5,
         0,
         "interface"
       ],
@@ -116,8 +128,8 @@
       [
         "SeaLogistics",
         "+ createTransport(): Transport",
-        0,
-        2,
+        1,
+        1,
         "class"
       ],
       [
@@ -130,8 +142,8 @@
       [
         "Ship",
         "+ deliver()",
-        2,
-        2,
+        3,
+        1,
         "class"
       ]
     ],
@@ -187,14 +199,14 @@
         "ModernChair",
         "+ sitOn()",
         0,
-        2,
+        1,
         "class"
       ],
       [
         "VictorianSofa",
         "+ lieOn()",
         2,
-        2,
+        1,
         "class"
       ]
     ],
@@ -214,7 +226,7 @@
       [
         "FurnitureFactory",
         "+ createChair(): Chair\n+ createSofa(): Sofa",
-        0,
+        0.5,
         0,
         "interface"
       ],
@@ -228,50 +240,50 @@
       [
         "VictorianFactory",
         "+ createChair(): Chair\n+ createSofa(): Sofa",
-        0,
-        2,
+        1,
+        1,
         "class"
       ],
       [
         "Chair",
         "+ sitOn()",
-        1,
-        0,
-        "interface"
-      ],
-      [
-        "Sofa",
-        "+ lieOn()",
-        2,
+        2.5,
         0,
         "interface"
       ],
       [
         "ModernChair",
         "+ sitOn()",
-        1,
+        2,
         1,
         "class"
       ],
       [
         "VictorianChair",
         "+ sitOn()",
+        3,
         1,
-        2,
         "class"
+      ],
+      [
+        "Sofa",
+        "+ lieOn()",
+        4.5,
+        0,
+        "interface"
       ],
       [
         "ModernSofa",
         "+ lieOn()",
-        2,
+        4,
         1,
         "class"
       ],
       [
         "VictorianSofa",
         "+ lieOn()",
-        2,
-        2,
+        5,
+        1,
         "class"
       ]
     ],
@@ -287,23 +299,23 @@
         "real"
       ],
       [
+        4,
+        3,
+        "real"
+      ],
+      [
         5,
         3,
         "real"
       ],
       [
-        6,
-        3,
-        "real"
-      ],
-      [
         7,
-        4,
+        6,
         "real"
       ],
       [
         8,
-        4,
+        6,
         "real"
       ]
     ],
@@ -453,7 +465,7 @@
     "snodes": [
       [
         "StockApplication",
-        "- analytics: AnalyticsService",
+        "- analytics: AnalyticsService\n+ analyzeStocks()",
         0,
         0,
         "class"
@@ -476,7 +488,7 @@
         "JsonAnalyticsLibrary",
         "+ analyze(json): Report",
         0,
-        2,
+        1,
         "class"
       ]
     ],
@@ -561,14 +573,14 @@
       [
         "Shape",
         "- color: Color\n+ draw() {abstract}",
-        0,
+        0.5,
         0,
         "abstract"
       ],
       [
         "Color",
         "+ apply()",
-        2,
+        2.5,
         0,
         "interface"
       ],
@@ -582,8 +594,8 @@
       [
         "Square",
         "+ draw()",
-        0,
-        2,
+        1,
+        1,
         "class"
       ],
       [
@@ -596,8 +608,8 @@
       [
         "Blue",
         "+ apply()",
-        2,
-        2,
+        3,
+        1,
         "class"
       ]
     ],
@@ -786,7 +798,7 @@
     "snodes": [
       [
         "VideoManager",
-        "- service: VideoService",
+        "- service: VideoService\n+ play(id)",
         0,
         0,
         "class"
@@ -794,22 +806,22 @@
       [
         "VideoService",
         "+ downloadVideo(id): Video",
-        2,
+        1.5,
         0,
         "interface"
       ],
       [
         "CachedVideoProxy",
         "- real: VideoService\n- cache: Map\n+ downloadVideo(id): Video",
+        0.5,
         1,
-        2,
         "class"
       ],
       [
         "ThirdPartyVideoService",
         "+ downloadVideo(id): Video",
-        2,
-        2,
+        2.5,
+        1,
         "class"
       ]
     ],
@@ -983,14 +995,14 @@
         "PdfMiner",
         "# extract(path): Data",
         0,
-        2,
+        1,
         "class"
       ],
       [
         "CsvMiner",
         "# extract(path): Data",
         2,
-        2,
+        1,
         "class"
       ]
     ],
@@ -1047,22 +1059,22 @@
       [
         "RoadRoute",
         "+ buildRoute(a, b): Route",
-        0,
-        2,
+        1,
+        1,
         "class"
       ],
       [
         "WalkingRoute",
         "+ buildRoute(a, b): Route",
-        1,
         2,
+        1,
         "class"
       ],
       [
         "TransitRoute",
         "+ buildRoute(a, b): Route",
-        2,
-        2,
+        3,
+        1,
         "class"
       ]
     ],
@@ -1129,22 +1141,22 @@
       [
         "Draft",
         "+ publish(doc, user)",
-        0,
-        2,
+        1,
+        1,
         "class"
       ],
       [
         "Moderation",
         "+ publish(doc, user)",
-        1,
         2,
+        1,
         "class"
       ],
       [
         "Published",
         "+ publish(doc, user)",
-        2,
-        2,
+        3,
+        1,
         "class"
       ]
     ],
