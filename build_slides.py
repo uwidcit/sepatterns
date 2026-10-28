@@ -14,131 +14,203 @@ def n(name, members, col, row, kind='class'):
 def add(title,category,case,desc,problem,solution,before,after,module,pnodes,pedges,snodes,sedges,reuse=''):
     DATA.append(dict(title=title,category=category,case=case,desc=desc,problem=problem,solution=solution,before=before,after=after,module=module,pnodes=pnodes,pedges=pedges,snodes=snodes,sedges=sedges,reuse=reuse))
 
-add('Singleton','Creational','Shared database connection',
-'Provide one shared instance through a controlled access point.',
-'Independent callers create separate database connections.', 'Hide construction; return the same instance to every caller.',
-'a = new Database()\nb = new Database()\na.query(sql)\n// a and b are different objects',
-'a = Database.getInstance()\nb = Database.getInstance()\na.query(sql)\nassert a is b',
-'// Database: lazy, thread-safe accessor\nstatic synchronized getInstance():\n    if instance == null: instance = new Database()\n    return instance',
-[n('Application','+ run()',0,0),n('Database','+ Database()\n+ query(sql)',2,1)],[(0,1,'dep')],
-[n('Application','+ run()',0,0),n('Database','- instance: Database {static}\n- Database()\n+ getInstance(): Database {static}\n+ query(sql)',2,1)],[(0,1,'dep')], 'Singleton Pattern_ Thread-Safe Instance Sharing.png')
+add('Singleton','Creational','Shared Config across services',
+'Ensures a class has only one instance and provides a global point of access to it.',
+'• User drives UserService / OrderService / ReportService; each needs Config.\n'
+'• Call order is not fixed—any service may run first.\n'
+'• Each service copies if config == null: config = new Config() → multiple instances.',
+'• User still calls doWork(); services only call Config.getInstance().\n'
+'• The null-check and construction live once inside Config.\n'
+'• First caller creates it; every service shares that instance.',
+'// inside each service (User API unchanged)\nif config == null:\n    config = new Config()\nconfig.load()\n// same guard in UserService, OrderService, ReportService',
+'// inside each service (User API unchanged)\nconfig = Config.getInstance()\nconfig.load()\n// same load; guard moved into Config',
+'// MODULE — Config singleton (owns the lazy init)\nprivate static instance\nprivate Config(): load()\nstatic getInstance():\n    if instance == null:\n        instance = new Config()\n    return instance',
+[n('User','+ run()',1.2,0),
+ n('UserService','+ doWork()',0,1),n('OrderService','+ doWork()',1.2,1),n('ReportService','+ doWork()',2.4,1),
+ n('Config #1','+ load()',0,2),n('Config #2','+ load()',1.2,2),n('Config #3','+ load()',2.4,2)],
+[(0,1,'dep'),(0,2,'dep'),(0,3,'dep'),(1,4,'dep'),(2,5,'dep'),(3,6,'dep')],
+[n('User','+ run()',1.2,0),
+ n('UserService','+ doWork()',0,1),n('OrderService','+ doWork()',1.2,1),n('ReportService','+ doWork()',2.4,1),
+ n('Config','- instance: Config {static}\n- Config()\n+ getInstance(): Config {static}\n+ load()',1.2,2)],
+[(0,1,'dep'),(0,2,'dep'),(0,3,'dep'),(1,4,'dep'),(2,4,'dep'),(3,4,'dep')], 'Singleton Pattern_ Thread-Safe Instance Sharing.png')
 
-add('Factory Method','Creational','Road and sea logistics',
-'Let creator subclasses choose the product used by shared business logic.',
-'Logistics constructs concrete transports; each new kind forces edits.', 'Override a creation method while preserving delivery planning.',
-'truck = new Truck()\nship = new Ship()\ntruck.deliver()\n// every new kind edits Logistics',
-'logistics = new SeaLogistics()\nlogistics.planDelivery()\n// planning uses Transport',
-'// Logistics.planDelivery()\nvehicle = createTransport()\nvehicle.deliver()\n// SeaLogistics.createTransport(): return new Ship()',
-[n('Logistics','+ planDelivery()',0,0),n('Truck','+ deliver()',2,1)],[(0,1,'dep')],
-[n('Logistics','+ planDelivery()\n+ createTransport(): Transport {abstract}',0,0,'abstract'),n('Transport','+ deliver()',2,0,'interface'),n('RoadLogistics','+ createTransport(): Transport',0,2),n('SeaLogistics','+ createTransport(): Transport',1,2),n('Truck / Ship','+ deliver()',2,2)],[(2,0,'gen'),(3,0,'gen'),(0,1,'dep'),(4,1,'real')], 'Factory Pattern Infographic_ Before and After (1).png')
+add('Factory Method','Creational','Plane, truck, and ship transport',
+'Provides an interface for creating objects, but lets subclasses decide which class to instantiate.',
+'• Client code needs to create different types of objects (e.g. Plane, Truck, Ship).\n'
+'• The client contains conditional logic and knows about all concrete classes.\n'
+'• Adding a new type requires modifying client code (violates Open/Closed Principle).\n'
+'• Object creation logic is scattered and duplicated across the application.\n'
+'• Client is tightly coupled to concrete classes.',
+'• Define a factory interface/class for creating products (e.g. Transport).\n'
+'• Concrete factory decides which concrete product to instantiate.\n'
+'• Client code works with the factory and the product interface, not concrete classes.\n'
+'• To add a new type, add a new product and update the factory (client code unchanged).\n'
+'• Centralizes and encapsulates object creation logic.',
+'plane = new Plane(); plane.fly()\ntruck = new Truck(); truck.drive()\nship = new Ship(); ship.sail()\n// three types; three different method names',
+'fleet = [factory.create("plane"),\n         factory.create("truck"),\n         factory.create("ship")]\nfor t in fleet: t.transport()\n// same three results; one Transport method',
+'// MODULE — creation API for client developers\n// TransportFactory.create(type)\nif type == "plane": return new Plane()\nelif type == "truck": return new Truck()\nelif type == "ship": return new Ship()\n// Plane/Truck/Ship implement Transport.transport()',
+[n('Client','+ run()',1,0),n('Plane','+ fly()',0,1),n('Truck','+ drive()',1,1),n('Ship','+ sail()',2,1)],[(0,1,'dep'),(0,2,'dep'),(0,3,'dep')],
+[n('Client','+ run()',0,0),n('TransportFactory','+ create(type: String): Transport',1,0),n('Transport','+ transport()',2.5,0,'interface'),n('Plane','+ transport()',1,1),n('Truck','+ transport()',2,1),n('Ship','+ transport()',3,1)],[(0,1,'dep'),(1,2,'dep'),(3,2,'real'),(4,2,'real'),(5,2,'real')], 'Factory Pattern Infographic_ Before and After (1).png')
 
-add('Abstract Factory','Creational','Matching furniture families',
-'Create related products through a family-specific factory.',
-'Direct construction can mix modern chairs with Victorian sofas.', 'Select one family factory; request products through interfaces.',
-'chair = new ModernChair()\nsofa = new VictorianSofa()\n// mismatched furniture family',
-'factory = new ModernFactory()\nchair = factory.createChair()\nsofa = factory.createSofa()',
-'// ModernFactory\ncreateChair(): return new ModernChair()\ncreateSofa():  return new ModernSofa()\n// VictorianFactory returns Victorian products',
-[n('Shop','+ furnish()',1,0),n('ModernChair','+ sitOn()',0,2),n('VictorianSofa','+ lieOn()',2,2)],[(0,1,'dep'),(0,2,'dep')],
-[n('FurnitureFactory','+ createChair(): Chair\n+ createSofa(): Sofa',1,0,'interface'),n('ModernFactory','+ createChair(): Chair\n+ createSofa(): Sofa',0,1),n('VictorianFactory','+ createChair(): Chair\n+ createSofa(): Sofa',2,1),n('Chair','+ sitOn()',0,2,'interface'),n('Sofa','+ lieOn()',2,2,'interface')],[(1,0,'real'),(2,0,'real'),(0,3,'dep'),(0,4,'dep')], 'abstractfactory.png')
+add('Abstract Factory','Creational','UPS and DHL transport families',
+'Create related product families through a factory interface.',
+'Client news every carrier concrete and calls drive / sail / fly separately.',
+'Pick a family factory; create as Transport; one transport() loop.',
+'dt = new DHLTruck(); dt.drive()\nds = new DHLShip();  ds.sail()\ndp = new DHLPlane(); dp.fly()\nut = new UPSTruck(); ut.drive()\nus = new UPSShip();  us.sail()\nup = new UPSPlane(); up.fly()',
+'dhl = new DHLFactory()\ndp = dhl.createPlane(); ds = dhl.createShip(); dt = dhl.createTruck()\nups = new UPSFactory()\nup = ups.createPlane(); us = ups.createShip(); ut = ups.createTruck()\nfleet = [dp, ds, dt, up, us, ut]\nfor t in fleet: t.transport()',
+'',
+# Before: Client between UPS row and DHL row (each product its own box).
+[n('Client','',1.5,1),
+ n('UPSPlane','',0,0),n('UPSTruck','',1.5,0),n('UPSShip','',3,0),
+ n('DHLPlane','',0,2),n('DHLTruck','',1.5,2),n('DHLShip','',3,2)],
+[(0,1,'dep'),(0,2,'dep'),(0,3,'dep'),(0,4,'dep'),(0,5,'dep'),(0,6,'dep')],
+# After: sample arrangement — factories sandwich TF; products flank Transport; create links.
+[n('Client','',0,1),
+ n('UPSFactory','',1,0),
+ n('TransportFactory','+ createPlane()\n+ createShip()\n+ createTruck()',1,1,'interface'),
+ n('DHLFactory','',1,2),
+ n('UPSPlane','',2.2,0),n('UPSTruck','',2.9,0),n('UPSShip','',3.6,0),
+ n('Transport','+ transport()',2.9,1,'interface'),
+ n('DHLPlane','',2.2,2),n('DHLTruck','',2.9,2),n('DHLShip','',3.6,2)],
+[(0,1,'dep'),(0,3,'dep'),
+ (1,2,'real'),(3,2,'real'),
+ (4,7,'real'),(5,7,'real'),(6,7,'real'),(8,7,'real'),(9,7,'real'),(10,7,'real'),
+ (1,4,'assoc'),(1,5,'assoc'),(1,6,'assoc'),
+ (3,8,'assoc'),(3,9,'assoc'),(3,10,'assoc')], 'abstractfactory.png')
 
-add('Builder','Creational','Cars and their manuals',
+add('Builder','Creational','Houses with optional features',
 'Separate construction steps from the representation being assembled.',
-'Long car constructors and separate manual assembly duplicate choices.', 'A director runs the same recipe against different builders.',
-'car = new Car(2, sportEngine, true)\nmanual = new Manual(2, "sport", "GPS")\n// maintain the same recipe twice',
-'builder = new CarBuilder()\ndirector.sportsCar(builder)\ncar = builder.getResult()\n// use ManualBuilder for a matching manual',
-'// Director.sportsCar(builder)\nbuilder.reset()\nbuilder.setSeats(2)\nbuilder.setEngine(sportEngine)\nbuilder.setGPS(true)',
-[n('Client','+ assemble()',1,0),n('Car','+ Car(seats, engine, gps)',0,2),n('Manual','+ Manual(seats, engine, gps)',2,2)],[(0,1,'dep'),(0,2,'dep')],
-[n('Director','+ sportsCar(b: Builder)',0,0),n('Builder','+ reset()\n+ setSeats(n)\n+ setEngine(e)\n+ setGPS(on)',2,0,'interface'),n('CarBuilder','+ getResult(): Car',1,2),n('ManualBuilder','+ getResult(): Manual',2,2)],[(0,1,'dep'),(2,1,'real'),(3,1,'real')])
+'• House grows telescoping constructors (rooms/doors/windows + pool/trees/…).\n'
+'• Client passes long positional bool lists—unclear which flag is which.\n'
+'• Adding a feature forces new overloads and updates every call site.',
+'• HouseBuilder names each step; ConcreteHouseBuilder adds extras.\n'
+'• HouseDirector encodes recipes (simple / family); Client can also chain steps.\n'
+'• Same houses; readable construction; product is House.',
+'houseA = new House(1, 1, 1)\nhouseB = new House(2, 2, 1, false, false, true, true)\nhouseC = new House(4, 3, 3, true, false, false, true)\nhouseD = new House(2, 1, 2, false, true, false, false)\nhouseE = new House(6, 4, 5, true, true, true, true)\n// five houses; magic bool positions',
+'director = new HouseDirector()\nhouseA = director.buildSimpleHouse(new ConcreteHouseBuilder())\nhouseB = new ConcreteHouseBuilder().addWindow().addWindow()\n    .addDoor().addDoor().addRoom().addStatues().addGarden().getResult()\nhouseC = director.buildFamilyHouse(new ConcreteHouseBuilder())\nhouseD = new ConcreteHouseBuilder().addWindow().addWindow()\n    .addDoor().addRoom().addRoom().addTrees().getResult()\nhouseE = new ConcreteHouseBuilder()\n    .addWindow().addWindow().addWindow().addWindow().addWindow().addWindow()\n    .addDoor().addDoor().addDoor().addDoor()\n    .addRoom().addRoom().addRoom().addRoom().addRoom()\n    .addPool().addTrees().addStatues().addGarden().getResult()\n// same five houses; named steps / director recipes',
+'',
+[n('Client','+ buildHouses()',0,0),
+ n('House','+ House(windows, doors, rooms)\n'
+  '+ House(windows, doors, rooms, pool)\n'
+  '+ House(windows, doors, rooms, pool, tree)\n'
+  '+ House(windows, doors, rooms, pool, tree, statues)\n'
+  '+ House(windows, doors, rooms, pool, tree, statues, garden)',1.2,0)],
+[(0,1,'dep')],
+[n('Client','+ buildHouses()',0,0),
+ n('HouseBuilder','+ addRoom()\n+ addDoor()\n+ addWindow()\n+ getResult(): House',1,0,'interface'),
+ n('HouseDirector','+ buildSimpleHouse(b)\n+ buildFamilyHouse(b)',2.6,0),
+ n('ConcreteHouseBuilder','+ addStatues()\n+ addTrees()\n+ addPool()\n+ addGarden()',1,1),
+ n('House','+ rooms: int\n+ doors: int\n+ windows: int',2.6,1)],
+[(0,1,'dep'),(0,2,'dep'),(2,1,'dep'),(3,1,'real'),(3,4,'assoc')], 'builder.png')
 
 add('Adapter','Structural','XML stock data and JSON analytics',
 'Translate an existing interface into the interface a client expects.',
-'The stock app supplies XML; the analytics library requires JSON.', 'An adapter accepts XML, converts it, then delegates analytics.',
-'xml = provider.getStockData()\nlibrary = new JsonAnalyticsLibrary()\nreport = library.analyze(xml)\n// incompatible input format',
-'service = new XmlAnalyticsAdapter(library)\nxml = provider.getStockData()\nreport = service.analyze(xml)',
-'// XmlAnalyticsAdapter.analyze(xml)\njson = convertXmlToJson(xml)\nreturn library.analyze(json)',
-[n('StockApplication','+ analyzeStocks()',0,0),n('StockDataProvider','+ getStockData(): XML',0,2),n('JsonAnalyticsLibrary','+ analyze(json): Report',2,1)],[(0,1,'dep'),(0,2,'dep')],
-[n('StockApplication','- analytics: AnalyticsService',0,0),n('AnalyticsService','+ analyze(xml): Report',2,0,'interface'),n('XmlAnalyticsAdapter','- library: JsonAnalyticsLibrary\n+ analyze(xml): Report',2,1),n('JsonAnalyticsLibrary','+ analyze(json): Report',0,2)],[(0,1,'assoc'),(2,1,'real'),(2,3,'assoc')], 'adapter.png')
+'The stock app supplies XML; the analytics library requires JSON.',
+'Adapter inherits AnalyticsService and composes JsonAnalyticsLibrary; converts then delegates.',
+'xml = provider.getStockData()\njson = convertXmlToJson(xml)\nreport = library.analyze(json)\n// same stock report; client does the conversion',
+'xml = provider.getStockData()\nreport = adapter.analyze(xml)\n// same stock report; adapter owns the conversion',
+'// MODULE — AnalyticsService API for client developers\n// XmlAnalyticsAdapter extends AnalyticsService\n// composes library: JsonAnalyticsLibrary\n// analyze(xml):\n//   json = convert(xml)\n//   return library.analyze(json)',
+[n('Client','+ analyzeStocks()',0,0),n('StockDataProvider','+ getStockData(): XML',0,1),n('JsonAnalyticsLibrary','+ analyze(json): Report',2,1)],[(0,1,'dep'),(0,2,'dep')],
+[n('Client','- analytics: AnalyticsService\n+ analyzeStocks()',0,0),
+ n('AnalyticsService','+ analyze(xml): Report {abstract}',1.5,0,'abstract'),
+ n('XmlAnalyticsAdapter','- library: JsonAnalyticsLibrary\n+ analyze(xml): Report\n- convert(xml): JSON',1.5,1),
+ n('JsonAnalyticsLibrary','+ analyze(json): Report',3.2,1)],
+[(0,1,'assoc'),(2,1,'gen'),(2,3,'compose')], 'adapter.png')
 
 add('Bridge','Structural','Shapes and colors',
 'Separate two independent dimensions so both can evolve independently.',
 'Each shape/color combination requires another subclass.', 'Shapes hold a Color reference instead of encoding color in inheritance.',
-'redCircle = new RedCircle()\nblueSquare = new BlueSquare()\nredCircle.draw()\n// more combinations, more classes',
-'shape = new Circle(new Red())\nshape.draw()\nshape.color = new Blue()\nshape.draw()',
-'// Circle.draw()\ncolor.apply()\nrenderCircleGeometry()\n// color and geometry vary independently',
-[n('Shape','+ draw()',1,0,'abstract'),n('RedCircle','+ draw()',0,2),n('BlueCircle','+ draw()',1,2),n('RedSquare','+ draw()',2,2)],[(1,0,'gen'),(2,0,'gen'),(3,0,'gen')],
-[n('Shape','- color: Color\n+ draw() {abstract}',0,0,'abstract'),n('Color','+ apply()',2,0,'interface'),n('Circle / Square','+ draw()',0,2),n('Red / Blue','+ apply()',2,2)],[(0,1,'assoc'),(2,0,'gen'),(3,1,'real')], 'bridge.png')
+'new RedCircle().draw()\nnew BlueSquare().draw()\n// red circle + blue square; one class per combo',
+'shapes = [new Circle(new Red()),\n          new Square(new Blue())]\nfor s in shapes: s.draw()\n// same two drawings; compose shape × color',
+'// MODULE — Shape API for client developers\n// Circle.draw()\ncolor.apply()\nrenderCircleGeometry()\n// color and geometry vary independently',
+[n('RedCircle','+ draw()',0,0),n('BlueCircle','+ draw()',1.2,0),n('RedSquare','+ draw()',2.4,0),
+ n('Client','+ render()',1.2,1)],[(3,0,'dep'),(3,1,'dep'),(3,2,'dep')],
+[n('Client','+ render()',0,0),n('Shape','- color: Color\n+ draw() {abstract}',1.2,0,'abstract'),n('Color','+ apply()',3.2,0,'interface'),n('Circle','+ draw()',0.7,1),n('Square','+ draw()',1.7,1),n('Red','+ apply()',2.7,1),n('Blue','+ apply()',3.7,1)],[(0,1,'dep'),(1,2,'compose'),(3,1,'gen'),(4,1,'gen'),(5,2,'real'),(6,2,'real')], 'bridge.png')
 
 add('Facade','Structural','Video conversion subsystem',
 'Expose a simple entry point to a complex subsystem.',
 'Every client coordinates codecs, bitrate conversion, and audio repair.', 'A facade orchestrates the subsystem behind one conversion call.',
-'codec = CodecFactory.extract(file)\nraw = BitrateReader.read(file, codec)\nvideo = BitrateReader.convert(raw, mp4)\nresult = AudioMixer.fix(video)',
-'converter = new VideoConverter()\nresult = converter.convert(file, "mp4")',
-'// VideoConverter.convert(file, format)\nsource = CodecFactory.extract(file)\nraw = BitrateReader.read(file, source)\nvideo = BitrateReader.convert(raw, codecFor(format))\nreturn AudioMixer.fix(video)',
-[n('Client','+ export()',1,0),n('CodecFactory','+ extract(file)',0,2),n('BitrateReader','+ read()\n+ convert()',1,2),n('AudioMixer','+ fix(video)',2,2)],[(0,1,'dep'),(0,2,'dep'),(0,3,'dep')],
-[n('Client','+ export()',0,0),n('VideoConverter','+ convert(file, format): File',2,0),n('CodecFactory','+ extract(file)',0,2),n('BitrateReader','+ read()\n+ convert()',1,2),n('AudioMixer','+ fix(video)',2,2)],[(0,1,'dep'),(1,2,'dep'),(1,3,'dep'),(1,4,'dep')], 'facade.png')
+'codec = CodecFactory.extract(file)\nraw = BitrateReader.read(file, codec)\nvideo = BitrateReader.convert(raw, mp4)\nresult = AudioMixer.fix(video)\n// export file as mp4 via subsystem steps',
+'result = new VideoConverter().convert(file, "mp4")\n// same mp4 export; one facade call',
+'// MODULE — VideoConverter facade API for client developers\n// VideoConverter.convert(file, format)\nsource = CodecFactory.extract(file)\nraw = BitrateReader.read(file, source)\nvideo = BitrateReader.convert(raw, codecFor(format))\nreturn AudioMixer.fix(video)',
+[n('Client','+ export()',1,0),n('CodecFactory','+ extract(file)',0,1),n('BitrateReader','+ read()\n+ convert()',1,1),n('AudioMixer','+ fix(video)',2,1)],[(0,1,'dep'),(0,2,'dep'),(0,3,'dep')],
+[n('Client','+ export()',0,0),n('VideoConverter','+ convert(file, format): File',2,0),n('CodecFactory','+ extract(file)',0,1),n('BitrateReader','+ read()\n+ convert()',1,1),n('AudioMixer','+ fix(video)',2,1)],[(0,1,'dep'),(1,2,'dep'),(1,3,'dep'),(1,4,'dep')], 'facade.png')
 
-add('Proxy','Structural','Cached third-party video service',
-'Control access to a service through the same interface.',
-'Repeated video downloads invoke the remote service again.', 'A proxy caches results and delegates only on a cache miss.',
-'service = new ThirdPartyVideoService()\na = service.downloadVideo(id)\nb = service.downloadVideo(id)\n// two remote requests',
-'service = new CachedVideoProxy(realService)\na = service.downloadVideo(id)\nb = service.downloadVideo(id)\n// second request uses the cache',
-'// CachedVideoProxy.downloadVideo(id)\nif not cache.contains(id):\n    cache[id] = real.downloadVideo(id)\nreturn cache[id]',
-[n('VideoManager','+ play(id)',0,0),n('ThirdPartyVideoService','+ downloadVideo(id): Video',2,1)],[(0,1,'dep')],
-[n('VideoManager','- service: VideoService',0,0),n('VideoService','+ downloadVideo(id): Video',2,0,'interface'),n('CachedVideoProxy','- real: VideoService\n- cache: Map\n+ downloadVideo(id): Video',1,2),n('ThirdPartyVideoService','+ downloadVideo(id): Video',2,2)],[(0,1,'assoc'),(2,1,'real'),(3,1,'real'),(2,3,'assoc')], 'Proxy Pattern_ Access Control Infographic.png')
+add('Proxy','Structural','Expensive database service with caching',
+'A stand-in object that controls access to a real service without changing its interface.',
+'• The real service is expensive to create or use (e.g. database, remote API, large object).\n'
+'• Repeated queries can be slow and waste resources.\n'
+'• The client may need to handle initialization or access control logic.\n'
+'• We want extra behavior (caching, logging, access control) without changing client code.',
+'• Introduce a proxy that implements the same interface as the real service.\n'
+'• The proxy controls access, adding lazy init, caching, logging, or access control.\n'
+'• Client uses the same interface—only the class it instantiates changes.\n'
+'• Adds: caching, lazy initialization, optional access control and logging.',
+'db = new ExpensiveDatabaseService()\nr1 = db.query("users")\nr2 = db.query("users")\n// two "users" results; two expensive hits',
+'db = new DatabaseProxy()\nr1 = db.query("users")\nr2 = db.query("users")\n// same two "users" results; second from cache',
+'// MODULE — DatabaseService API for client developers\n// DatabaseProxy.query(key)\nif cache.contains(key): return cache[key]\nif realService == null: realService = new RealDatabaseService()\nresult = realService.query(key)\ncache[key] = result; return result',
+[n('Client','+ run()',0,0),n('ExpensiveDatabaseService','+ ExpensiveDatabaseService()\n+ query(key): Result',2,1)],[(0,1,'dep')],
+[n('Client','+ run()',0,0),n('DatabaseService','+ query(key: String): Result',1.5,0,'interface'),n('DatabaseProxy','- realService: DatabaseService\n- cache: Map\n+ query(key): Result\n- getRealService()',0.5,1),n('RealDatabaseService','+ query(key): Result',2.5,1)],[(0,2,'dep'),(2,1,'real'),(3,1,'real'),(2,3,'assoc')], 'Proxy Pattern_ Access Control Infographic.png')
 
 add('Composite','Structural','Boxes containing products and boxes',
 'Treat individual objects and recursive groups through one interface.',
 'Pricing code distinguishes products from nested boxes repeatedly.', 'A box sums child prices; each child follows the same contract.',
-'total = 0\nfor item in box.contents:\n    if item is Product: total += item.price\n    else: total += priceNestedBox(item)',
-'order = new Box([product, innerBox])\ntotal = order.getPrice()\n// leaf and group are both OrderItem',
-'// Box.getPrice()\ntotal = 0\nfor child in children:\n    total += child.getPrice()\nreturn total',
-[n('PriceClient','+ total(box)',1,0),n('Product','+ price: Money',0,2),n('Box','+ contents: List',2,2)],[(0,1,'dep'),(0,2,'dep')],
-[n('OrderItem','+ getPrice(): Money',1,0,'interface'),n('Product','- price: Money\n+ getPrice(): Money',0,2),n('Box','- children: OrderItem[0..*]\n+ getPrice(): Money\n+ add(item)',2,2)],[(1,0,'real'),(2,0,'real'),(2,0,'aggregate')])
+'total = 0\nfor item in order.contents:\n    if item is Product: total += item.price\n    else: total += priceNestedBox(item)\n// price of product + nested box',
+'total = order.getPrice()\n// same total; one getPrice() on OrderItem',
+'// MODULE — OrderItem API for client developers\n// Box.getPrice()\ntotal = 0\nfor child in children:\n    total += child.getPrice()\nreturn total',
+[n('Client','+ total(box)',1,0),
+ n('Product','+ price: Money',0.5,1),n('Box','+ contents: List',1.5,1)],[(0,1,'dep'),(0,2,'dep')],
+# Client left of OrderItem on top; Product/Box only under OrderItem (no cross).
+[n('Client','+ total(item)',0,0),
+ n('OrderItem','+ getPrice(): Money',2.2,0,'interface'),
+ n('Product','- price: Money\n+ getPrice(): Money',1.6,1.25),
+ n('Box','- children: OrderItem[0..*]\n+ getPrice(): Money\n+ add(item)',2.8,1.25)],
+[(0,1,'dep'),(2,1,'real'),(3,1,'real'),(3,1,'aggregate')])
 
 add('Template Method','Behavioral','Mining PDF and CSV documents',
 'Fix an algorithm’s order while subclasses implement selected steps.',
 'Format-specific miners duplicate the processing and reporting pipeline.', 'Move the sequence into a base method; override extraction only.',
-'if format == "pdf":\n    data = pdf.extract(path)\nelse: data = csv.extract(path)\nreport = analyze(data)',
-'miner = new PdfMiner()\nreport = miner.mine(path)\n// CsvMiner uses the same pipeline',
-'// DataMiner.mine(path): fixed sequence\ndata = extract(path)\nreturn analyze(data)\n// PdfMiner.extract(path): return parsePdf(path)',
-[n('Client','+ run()',1,0),n('PdfMiner','+ extract(path)\n+ analyze(data)',0,2),n('CsvMiner','+ extract(path)\n+ analyze(data)',2,2)],[(0,1,'dep'),(0,2,'dep')],
-[n('DataMiner','+ mine(path): Report\n# extract(path): Data {abstract}\n# analyze(data): Report',1,0,'abstract'),n('PdfMiner','# extract(path): Data',0,2),n('CsvMiner','# extract(path): Data',2,2)],[(1,0,'gen'),(2,0,'gen')])
+'pdfReport = analyze(pdf.extract(pdfPath))\ncsvReport = analyze(csv.extract(csvPath))\n// two reports; client repeats extract+analyze',
+'miners = [new PdfMiner(), new CsvMiner()]\nreports = []\nfor m in miners: reports.add(m.mine(pathFor(m)))\n// same two reports; one mine() pipeline each',
+'// MODULE — DataMiner.mine API for client developers\n// DataMiner.mine(path): fixed sequence\ndata = extract(path)\nreturn analyze(data)\n// PdfMiner.extract(path): return parsePdf(path)',
+[n('Client','+ run()',1,0),n('PdfMiner','+ extract(path)\n+ analyze(data)',0,1),n('CsvMiner','+ extract(path)\n+ analyze(data)',2,1)],[(0,1,'dep'),(0,2,'dep')],
+[n('Client','+ run()',0,0),n('DataMiner','+ mine(path): Report\n# extract(path): Data {abstract}\n# analyze(data): Report',1.5,0,'abstract'),n('PdfMiner','# extract(path): Data',1,1),n('CsvMiner','# extract(path): Data',2.5,1)],[(0,1,'dep'),(2,1,'gen'),(3,1,'gen')])
 
 add('Strategy','Behavioral','Navigation route algorithms',
 'Make alternative algorithms interchangeable through a shared contract.',
 'A navigator grows conditionals for road, walking, and transit routes.', 'Delegate routing to a strategy selected by the client.',
-'if mode == "road": route = roadRoute(a, b)\nelif mode == "walk": route = walkRoute(a, b)\nelse: route = transitRoute(a, b)',
-'navigator.setStrategy(new WalkingRoute())\nroute = navigator.buildRoute(a, b)\n// choose another strategy at runtime',
-'// Navigator.buildRoute(a, b)\nreturn strategy.buildRoute(a, b)\n// WalkingRoute builds pedestrian paths',
-[n('Navigator','- mode: String\n+ buildRoute(a, b): Route',1,1)],[],
-[n('Navigator','- strategy: RouteStrategy\n+ setStrategy(s)\n+ buildRoute(a, b): Route',0,0),n('RouteStrategy','+ buildRoute(a, b): Route',2,0,'interface'),n('RoadRoute','+ buildRoute(a, b): Route',0,2),n('WalkingRoute','+ buildRoute(a, b): Route',1,2),n('TransitRoute','+ buildRoute(a, b): Route',2,2)],[(0,1,'assoc'),(2,1,'real'),(3,1,'real'),(4,1,'real')])
+'road = roadRoute(a, b)\nwalk = walkRoute(a, b)\ntransit = transitRoute(a, b)\n// three routes; client branches per mode',
+'for s in [new RoadRoute(), new WalkingRoute(),\n          new TransitRoute()]:\n    navigator.setStrategy(s)\n    routes.add(navigator.buildRoute(a, b))\n// same three routes; one buildRoute() API',
+'// MODULE — Navigator API for client developers\n// Navigator.buildRoute(a, b)\nreturn strategy.buildRoute(a, b)\n// WalkingRoute builds pedestrian paths',
+[n('Client','+ navigate()',0,0),n('Navigator','- mode: String\n+ buildRoute(a, b): Route',2,0)],[(0,1,'dep')],
+[n('Client','+ navigate()',0,0),n('Navigator','- strategy: RouteStrategy\n+ setStrategy(s)\n+ buildRoute(a, b): Route',1,0),n('RouteStrategy','+ buildRoute(a, b): Route',2.5,0,'interface'),n('RoadRoute','+ buildRoute(a, b): Route',1.5,1),n('WalkingRoute','+ buildRoute(a, b): Route',2.5,1),n('TransitRoute','+ buildRoute(a, b): Route',3.5,1)],[(0,1,'dep'),(1,2,'assoc'),(3,2,'real'),(4,2,'real'),(5,2,'real')])
 
 add('State','Behavioral','Document publication workflow',
 'Delegate behavior to an object representing the current state.',
 'Publication rules accumulate in a switch over document status.', 'Each state handles publish and can transition the document.',
-'if doc.status == "draft":\n    doc.status = "moderation"\nelif doc.status == "moderation" and user.isAdmin:\n    doc.status = "published"',
-'doc = new Document(new Draft())\ndoc.publish(user)  // enters moderation\ndoc.publish(admin) // becomes published',
-'// Moderation.publish(doc, user)\nif user.isAdmin:\n    doc.changeState(new Published())\n// Published.publish(...) does nothing',
-[n('Document','- status: String\n+ publish(user)',1,1)],[],
-[n('Document','- state: PublicationState\n+ publish(user)\n+ changeState(s)',0,0),n('PublicationState','+ publish(doc, user)',2,0,'interface'),n('Draft','+ publish(doc, user)',0,2),n('Moderation','+ publish(doc, user)',1,2),n('Published','+ publish(doc, user)',2,2)],[(0,1,'assoc'),(2,1,'real'),(3,1,'real'),(4,1,'real')])
+'doc.status = "draft"\ndoc.status = "moderation"   // submit\ndoc.status = "published"    // admin approve\n// draft → moderation → published via status ifs',
+'doc = new Document(new Draft())\ndoc.publish(user)   // enters moderation\ndoc.publish(admin)  // becomes published\n// same draft → moderation → published path',
+'// MODULE — Document.publish API for client developers\n// Moderation.publish(doc, user)\nif user.isAdmin:\n    doc.changeState(new Published())\n// Published.publish(...) does nothing',
+[n('Client','+ publishDoc()',0,0),n('Document','- status: String\n+ publish(user)',2,0)],[(0,1,'dep')],
+[n('Client','+ publishDoc()',0,0),n('Document','- state: PublicationState\n+ publish(user)\n+ changeState(s)',1,0),n('PublicationState','+ publish(doc, user)',2.5,0,'interface'),n('Draft','+ publish(doc, user)',1.5,1),n('Moderation','+ publish(doc, user)',2.5,1),n('Published','+ publish(doc, user)',3.5,1)],[(0,1,'dep'),(1,2,'assoc'),(3,2,'real'),(4,2,'real'),(5,2,'real')])
 
 add('Observer','Behavioral','Editor events notify logging and email',
 'Notify registered subscribers when a publisher emits an event.',
 'Editor logic directly invokes concrete logging and email services.', 'Publish an event; subscribers handle their own reactions.',
-'editor.saveFile()\nlogger.write(file.name)\nmailer.send(file.name)\n// client must wire every reaction',
-'events.subscribe("save", new LogListener())\nevents.subscribe("save", new EmailListener())\neditor.saveFile() // emits save event',
-'// EventManager.notify(type, data)\nfor listener in listeners[type]:\n    listener.update(data)\n// Editor.saveFile(): write(); events.notify("save", name)',
-[n('Editor','+ saveFile()',1,0),n('Logger','+ write(name)',0,2),n('Mailer','+ send(name)',2,2)],[(0,1,'dep'),(0,2,'dep')],
-[n('Editor','- events: EventManager\n+ saveFile()',0,0),n('EventManager','- listeners: EventListener[0..*]\n+ subscribe(type, listener)\n+ unsubscribe(type, listener)\n+ notify(type, data)',1,1),n('EventListener','+ update(data)',2,0,'interface'),n('LogListener','+ update(data)',0,2),n('EmailListener','+ update(data)',2,2)],[(0,1,'assoc'),(1,2,'assoc'),(3,2,'real'),(4,2,'real')])
+'editor.saveFile()\nlogger.write(file.name)\nmailer.send(file.name)\n// save + log + email; client wires reactions',
+'events.subscribe("save", new LogListener())\nevents.subscribe("save", new EmailListener())\neditor.saveFile()\n// same save + log + email; listeners react',
+'// MODULE — EventManager API for client developers\n// EventManager.notify(type, data)\nfor listener in listeners[type]:\n    listener.update(data)\n// Editor.saveFile(): write(); events.notify("save", name)',
+[n('Client','+ save()',0,0),n('Editor','+ saveFile()',1,0),n('Logger','+ write(name)',0,1),n('Mailer','+ send(name)',2,1)],[(0,1,'dep'),(1,2,'dep'),(1,3,'dep')],
+[n('Client','+ setup()',0,0),n('Editor','- events: EventManager\n+ saveFile()',1,0),n('EventManager','- listeners: EventListener[0..*]\n+ subscribe(type, listener)\n+ notify(type, data)',2,0),n('EventListener','+ update(data)',3,0,'interface'),n('LogListener','+ update(data)',2,1),n('EmailListener','+ update(data)',3,1)],[(0,1,'dep'),(0,2,'dep'),(1,2,'assoc'),(2,3,'assoc'),(4,3,'real'),(5,3,'real')])
 
 add('Command','Behavioral','Undoable text-editor actions',
 'Represent a request as an object that can be invoked and undone.',
 'Buttons and shortcuts duplicate editing actions without shared undo.', 'Bind both triggers to a command; store successful edits in history.',
-'pasteButton.onClick(() => editor.insert(text))\nshortcut.onPress(() => editor.insert(text))\n// duplicated action; no undo record',
-'paste = new PasteCommand(editor, text)\npasteButton.bind(() => app.execute(paste))\nshortcut.bind(() => app.execute(paste))\napp.undo()',
-'// PasteCommand.execute()\nbackup = editor.text; editor.insert(text)\nreturn true  // app records command in history\n// undo(): editor.text = backup',
-[n('PasteButton','+ click()',0,0),n('Shortcut','+ press()',2,0),n('Editor','+ insert(text)',1,2)],[(0,2,'dep'),(1,2,'dep')],
-[n('Application','- history: Command[*]\n+ execute(command)\n+ undo()',0,0),n('Command','+ execute(): Boolean\n+ undo()',2,0,'interface'),n('PasteCommand','- editor: Editor\n- backup: String\n+ execute(): Boolean\n+ undo()',2,2),n('Editor','+ text: String\n+ insert(text)',0,2)],[(0,1,'assoc'),(2,1,'real'),(2,3,'assoc')])
+'pasteButton.click()  // editor.insert(text)\nshortcut.press()     // editor.insert(text)\n// paste from two triggers; logic duplicated, no undo',
+'paste = new PasteCommand(editor, text)\npasteButton.bind(() => app.execute(paste))\nshortcut.bind(() => app.execute(paste))\npasteButton.click(); shortcut.press()\n// same two pastes via shared command',
+'// MODULE — Command API for client developers\n// PasteCommand.execute()\nbackup = editor.text; editor.insert(text)\nreturn true  // app records command in history\n// undo(): editor.text = backup',
+[n('Client','+ trigger()',1,0),n('PasteButton','+ click()',0,1),n('Shortcut','+ press()',1,1),n('Editor','+ insert(text)',2,1)],[(0,1,'dep'),(0,2,'dep'),(1,3,'dep'),(2,3,'dep')],
+[n('Client','+ trigger()',0,0),n('Application','- history: Command[*]\n+ execute(command)\n+ undo()',1,0),n('Command','+ execute(): Boolean\n+ undo()',2.5,0,'interface'),n('PasteCommand','- editor: Editor\n- backup: String\n+ execute(): Boolean\n+ undo()',2,1),n('Editor','+ text: String\n+ insert(text)',0.5,1)],[(0,1,'dep'),(1,2,'assoc'),(3,2,'real'),(3,4,'assoc')])
 
 # UML rendering: ordinary three-compartment classes, interface stereotypes,
 # hollow generalization/realization triangles, open dependencies, navigable
@@ -146,20 +218,26 @@ add('Command','Behavioral','Undoable text-editor actions',
 # Layout rule: place sibling subclasses side-by-side under their parent so
 # inheritance uses short vertical arrows (sample / refactoring.guru style).
 INK='#172B4D'; BLUE='#1662C4'; RED='#B14747'; GREEN='#13746A'
-def uml(nodes,edges,path):
+def uml(nodes,edges,path,compact=False):
     import heapq
     CW,CH=660,270
     buf=io.BytesIO(); c=canvas.Canvas(buf,pagesize=(CW,CH))
     cols=sorted({float(n[2]) for n in nodes})
     span=(max(cols)-min(cols)+1) if cols else 1
     pitch=min(220,(CW-20)/span)
-    box_w=min(198,pitch-16)
+    box_w=min(198 if not compact else 168,pitch-12 if compact else pitch-16)
     max_row=max(float(n[3]) for n in nodes) or 1
     row_pitch=(CH-28)/(max_row+0.9)
+    line_h=9 if compact else 11
+    header_h=18 if compact else 20
     boxes=[]; centers=[]
     for name,members,col,row,kind in nodes:
         x=10+float(col)*pitch+(pitch-box_w)/2
-        h=28+len(members.split('\n'))*11
+        # Empty members → single-compartment (name-only) box; multi-line names allowed.
+        if not (members or '').strip():
+            h=max(header_h+4, 6+len(name.split('\n'))*line_h)
+        else:
+            h=header_h+8+len(members.split('\n'))*line_h
         y=CH-14-float(row)*row_pitch
         boxes.append((x,y,box_w,h)); centers.append((x+box_w/2,y-h/2))
     MARGIN=7
@@ -176,6 +254,18 @@ def uml(nodes,edges,path):
         return False
     def clear_path(pts,ignore=()):
         return all(not segment_hits(u,v,ignore) for u,v in zip(pts,pts[1:]))
+    def line_hits(u,v,ignore=()):
+        # Axis-aligned or diagonal: sample so diagonal deps can stay clear of boxes.
+        length=math.hypot(v[0]-u[0],v[1]-u[1]) or 1
+        steps=max(10,int(length/3))
+        for i in range(1,steps):
+            t=i/steps
+            px=u[0]+(v[0]-u[0])*t; py=u[1]+(v[1]-u[1])*t
+            for j,box in enumerate(boxes):
+                if j in ignore: continue
+                x,y,w,h=inflate(box)
+                if x<px<x+w and y-h<py<y: return True
+        return False
     def stub(point,box,dist=9):
         x,y,w,h=box; px,py=point
         if abs(px-x)<0.5: return (px-dist,py)
@@ -201,27 +291,56 @@ def uml(nodes,edges,path):
     def pick_anchors(ai,bi,t):
         A,B=boxes[ai],boxes[bi]
         ax,ay=centers[ai]; bx,by=centers[bi]
-        if t=='aggregate':
-            return (A[0]+A[2],ay),(B[0]+B[2],by)
-        # Inheritance / realization: child below parent, arrow into parent bottom.
-        if t in ('gen','real') and by>=ay-8:
+        if t in ('aggregate','compose'):
+            # Diamond at whole (ai). PDF y grows up — smaller y is lower on screen.
+            # When whole sits below the part (Composite Box under OrderItem),
+            # pin both anchors on the outer vertical side so the loop does not
+            # cross realization into the parent's bottom edge.
+            if ay<by-8:
+                if ax>=bx:
+                    return (A[0]+A[2],ay),(B[0]+B[2],by)
+                return (A[0],ay),(B[0],by)
+            if abs(ax-bx)>8:
+                return ((A[0]+A[2],ay) if ax<bx else (A[0],ay),
+                        (B[0],by) if ax<bx else (B[0]+B[2],by))
+            return ((bottom_anchor(A) if ay>by else top_anchor(A)),
+                    (top_anchor(B) if ay>by else bottom_anchor(B)))
+        # Inheritance / realization: arrow into the parent. Children may sit
+        # below (into bottom) or above (into top) — Abstract Factory sample.
+        if t in ('gen','real'):
             siblings=[i for i,j,tt in edges if j==bi and tt in ('gen','real')]
             if len(siblings)>1 and ai in siblings:
                 idx=siblings.index(ai); n=len(siblings)
                 frac=0.30+0.40*(idx/(n-1))
             else:
                 frac=0.5
-            return top_anchor(A,0.5), bottom_anchor(B,frac)
-        # Sample-style tree: parent above children uses bottom → top anchors
-        # (Factory before diagram: Logistics down to Truck / Ship).
-        if ay>by+20 and abs(ax-bx)>8:
+            if by>=ay-8:  # child below / level → parent bottom
+                return top_anchor(A,0.5), bottom_anchor(B,frac)
+            return bottom_anchor(A,0.5), top_anchor(B,frac)  # child above → parent top
+        # Fan-out tree only: several children below share bottom → top anchors
+        # (Factory before: Application down to Plane / Truck / Ship). A single
+        # diagonal dependency must not take this path — it produces a long L.
+        if ay>by+20:
             siblings=[i for i,j,tt in edges if i==ai and tt==t and centers[j][1]<ay-10]
-            frac=0.5
-            if len(siblings)>1 and bi in siblings:
-                idx=siblings.index(bi); n=len(siblings)
-                frac=0.28+0.44*(idx/(n-1))
-            return bottom_anchor(A,frac), top_anchor(B,0.5)
-        if abs(ay-by)*1.15<=abs(ax-bx):
+            nearly_under=abs(ax-bx)<=max(box_w*0.55,pitch*0.35)
+            if len(siblings)>1 or nearly_under:
+                frac=0.5
+                if len(siblings)>1 and bi in siblings:
+                    idx=siblings.index(bi); n=len(siblings)
+                    frac=0.28+0.44*(idx/(n-1))
+                return bottom_anchor(A,frac), top_anchor(B,0.5)
+        # Fan-out upward: Client under modules (Composite / Bridge problem).
+        if by>ay+20 and t in ('dep','assoc'):
+            siblings=[i for i,j,tt in edges if i==ai and tt==t and centers[j][1]>ay+10]
+            nearly_over=abs(ax-bx)<=max(box_w*0.55,pitch*0.35)
+            if len(siblings)>1 or nearly_over:
+                frac=0.5
+                if len(siblings)>1 and bi in siblings:
+                    idx=siblings.index(bi); n=len(siblings)
+                    frac=0.28+0.44*(idx/(n-1))
+                return top_anchor(A,frac), bottom_anchor(B,0.5)
+        # Facing sides for side-by-side or diagonal pairs (avoids bottom→across L).
+        if abs(ax-bx)>8:
             return ((A[0]+A[2],ay) if ax<bx else (A[0],ay),
                     (B[0],by) if ax<bx else (B[0]+B[2],by))
         return ((bottom_anchor(A) if ay>by else top_anchor(A)),
@@ -283,9 +402,15 @@ def uml(nodes,edges,path):
             if not clear_path(pts,ignore={ai,bi}): continue
             bends=max(0,len(pts)-2)
             length=sum(abs(u[0]-v[0])+abs(u[1]-v[1]) for u,v in zip(pts,pts[1:]))
-            scored.append((bends,length,pts))
+            # Penalize long doglegs: short stub then a much longer crosspiece.
+            dogleg=0
+            if len(pts)>=3:
+                segs=[abs(u[0]-v[0])+abs(u[1]-v[1]) for u,v in zip(pts,pts[1:])]
+                if segs[0]<35 and max(segs[1:])>segs[0]*2.5:
+                    dogleg=1
+            scored.append((dogleg,bends,length,pts))
         if scored:
-            scored.sort(); return scored[0][2]
+            scored.sort(); return scored[0][3]
         return None
     def route_astar(a,b,ai,bi):
         aa=stub(a,boxes[ai]); bb=stub(b,boxes[bi])
@@ -339,37 +464,132 @@ def uml(nodes,edges,path):
                 mid=mid+[(b[0],mid[-1][1])] if abs(b[1]-mid[-1][1])<=abs(b[0]-mid[-1][0]) else mid+[(mid[-1][0],b[1])]
             mid=mid+[b]
         return simplify(mid)
-    def route(a,b,ai,bi):
+    def on_vertical_side(pt,box):
+        x,y,w,h=box
+        return abs(pt[0]-x)<0.5 or abs(pt[0]-(x+w))<0.5
+    def route(a,b,ai,bi,t='dep'):
+        # Straight connector only for side-facing deps/assocs (Singleton-style
+        # diagonal pairs). Bottom→top fan-outs keep orthogonal inverted-T trees.
+        if (t in ('dep','assoc') and on_vertical_side(a,boxes[ai]) and on_vertical_side(b,boxes[bi])
+                and not line_hits(a,b,{ai,bi})):
+            return [a,b]
+        # Fan-out from a parent above: short inverted-T into each child's top.
+        if t=='dep' and centers[ai][1]>centers[bi][1]+20:
+            siblings=[i for i,j,tt in edges if i==ai and tt==t and centers[j][1]<centers[ai][1]-10]
+            if len(siblings)>1:
+                bus=round((a[1]+b[1])/2,1)
+                pts=simplify([a,(a[0],bus),(b[0],bus),b])
+                if clear_path(pts,ignore={ai,bi}) or abs(a[0]-b[0])<box_w:
+                    return pts
+                # Nearly under: drop straight with a tiny jog.
+                if abs(a[0]-b[0])<box_w*0.7:
+                    return simplify([a,(b[0],a[1]),b])
+        # Composite aggregation/composition: from whole's right, up above the
+        # parent, into the parent's top — clears Client→parent side deps and
+        # realization into the parent's bottom. PDF y grows up.
+        if t in ('aggregate','compose') and centers[ai][1]<centers[bi][1]-8:
+            A,B=boxes[ai],boxes[bi]
+            a=(A[0]+A[2],centers[ai][1])
+            b=top_anchor(B,0.82)
+            over=min(CH-10, B[1]+26)
+            gut=min(CW-10, max(A[0]+A[2],B[0]+B[2])+36)
+            return simplify([a,(gut,a[1]),(gut,over),(b[0],over),b])
         simple=try_routes(a,b,ai,bi)
         if simple is not None:
             return join_orthogonal(a,simple,b)
-        return join_orthogonal(a,route_astar(a,b,ai,bi),b)
+        try:
+            return join_orthogonal(a,route_astar(a,b,ai,bi),b)
+        except RuntimeError:
+            # Factory→product create links must still draw (sample curved fans).
+            if t not in ('assoc','aggregate','compose'):
+                raise
+            over=max(boxes[ai][1],boxes[bi][1])+18
+            under=min(boxes[ai][1]-boxes[ai][3],boxes[bi][1]-boxes[bi][3])-18
+            mid=(a[1]+b[1])/2
+            for y in (over,under,mid):
+                pts=simplify([a,(a[0],y),(b[0],y),b])
+                if clear_path(pts,ignore={ai,bi}):
+                    return pts
+            gut=max(boxes[ai][0]+boxes[ai][2],boxes[bi][0])+14
+            return simplify([a,(gut,a[1]),(gut,b[1]),b])
     def inheritance_path(a,b,ai,bi):
-        # Child below parent: inverted-T with vertical stubs so the hollow
-        # triangle always points into the parent's bottom edge (never sideways).
-        bus=round((a[1]+b[1])/2,1)
-        for bus_y in (bus, round(a[1]+(b[1]-a[1])*0.4,1), round(a[1]+(b[1]-a[1])*0.65,1)):
+        # Inverted-T / upright-T so the hollow triangle always meets the parent
+        # on a horizontal edge (bottom when child is below, top when above).
+        # Keep the bus clearly between the boxes (never level with a top-row dep).
+        lo,hi=min(a[1],b[1]),max(a[1],b[1])
+        bus=round(lo+(hi-lo)*0.45,1)
+        for bus_y in (bus, round(lo+(hi-lo)*0.35,1), round(lo+(hi-lo)*0.55,1)):
             pts=simplify([a,(a[0],bus_y),(b[0],bus_y),b])
             if clear_path(pts,ignore={ai,bi}): return pts
         return simplify([a,(a[0],bus),(b[0],bus),b])
+    def is_orthogonal(pts):
+        return all(abs(u[0]-v[0])<0.01 or abs(u[1]-v[1])<0.01 for u,v in zip(pts,pts[1:]))
+    # Boxes first so composition diamonds / arrowheads paint on top and stay visible.
+    c.setLineWidth(1.15 if compact else 1.25)
+    name_fs=9 if compact else 10
+    body_fs=7.5 if compact else 8.5
+    for (name,members,col,row,kind),(x,y,w,h) in zip(nodes,boxes):
+        c.setFillColor(white); c.rect(x,y-h,w,h,fill=1,stroke=1)
+        c.setStrokeColor(HexColor('#17212E'))
+        c.setFillColor(HexColor(INK))
+        if not (members or '').strip():
+            c.setFillColor(HexColor('#EBEEF4')); c.rect(x,y-h,w,h,fill=1,stroke=1)
+            c.setFillColor(HexColor(INK))
+            lines=name.split('\n')
+            fs=min(name_fs,(w-8)/(max(max(len(L) for L in lines),1)*.54))
+            c.setFont('Helvetica-Bold',fs)
+            top=y-4-(h-len(lines)*line_h)/2
+            for i,L in enumerate(lines):
+                c.drawCentredString(x+w/2,top-i*line_h-fs*0.75,L)
+            continue
+        c.setFillColor(HexColor('#DFE5F0' if kind=='interface' else '#EBEEF4'))
+        c.rect(x,y-header_h,w,header_h,fill=1,stroke=0)
+        c.setStrokeColor(HexColor('#17212E')); c.line(x,y-header_h,x+w,y-header_h)
+        label=('<<interface>> ' if kind=='interface' else '')+name
+        c.setFillColor(HexColor(INK))
+        c.setFont('Helvetica-BoldOblique' if kind=='abstract' else 'Helvetica-Bold',
+                  min(name_fs,(w-10)/(max(len(label),1)*.54)))
+        c.drawCentredString(x+w/2,y-header_h+5,label)
+        attrs=[s for s in members.split('\n') if '(' not in s]
+        ops=[s for s in members.split('\n') if '(' in s]
+        yy=y-header_h-line_h; c.setFont('Courier',body_fs)
+        for s in attrs: c.drawString(x+5,yy,s); yy-=line_h
+        c.line(x,yy+6,x+w,yy+6)
+        for s in ops:
+            size=min(body_fs,(w-12)/(max(len(s),1)*.55)); c.setFont('Courier',size)
+            c.drawString(x+5,yy-3,s)
+            if '{static}' in s:
+                c.line(x+5,yy-5,x+5+pdfmetrics.stringWidth(s,'Courier',size),yy-5)
+            yy-=line_h
     c.setStrokeColor(HexColor('#17212E')); c.setLineWidth(1.9); c.setLineJoin(0)
     for ai,bi,t in edges:
         a,b=pick_anchors(ai,bi,t)
-        if t in ('gen','real') and b[1]>=a[1]-8:
+        if t in ('gen','real'):
             points=inheritance_path(a,b,ai,bi)
         else:
-            points=route(a,b,ai,bi)
-        if not all(abs(u[0]-v[0])<0.01 or abs(u[1]-v[1])<0.01 for u,v in zip(points,points[1:])):
+            points=route(a,b,ai,bi,t)
+        if t in ('gen','real') and not is_orthogonal(points):
             points=join_orthogonal(a,[],b)
-        assert all(abs(u[0]-v[0])<0.01 or abs(u[1]-v[1])<0.01 for u,v in zip(points,points[1:])), (a,b,points)
+        if t in ('gen','real'):
+            assert is_orthogonal(points), (a,b,points)
+        # Decorations follow the routed path (route may move aggregate anchors).
+        a,b=points[0],points[-1]
         dx=b[0]-points[-2][0]; dy=b[1]-points[-2][1]
         length=math.hypot(dx,dy) or 1; ux,uy=dx/length,dy/length; vx,vy=-uy,ux
         c.setDash(6,3) if t in ('dep','real') else c.setDash()
-        # Stop the shaft before the hollow triangle so stroke and fill do not clash.
         draw_pts=list(points)
         if t in ('gen','real') and len(draw_pts)>=2:
             tip_back=(b[0]-12*ux,b[1]-12*uy)
             draw_pts=draw_pts[:-1]+[tip_back]
+        elif t in ('dep','assoc') and len(draw_pts)>=2:
+            tip_back=(b[0]-10*ux,b[1]-10*uy)
+            draw_pts=draw_pts[:-1]+[tip_back]
+        if t in ('aggregate','compose') and len(draw_pts)>=2:
+            dx0=draw_pts[1][0]-a[0]; dy0=draw_pts[1][1]-a[1]
+            len0=math.hypot(dx0,dy0) or 1
+            ux0,uy0=dx0/len0,dy0/len0
+            tip_back=(b[0]-10*ux,b[1]-10*uy)
+            draw_pts=[(a[0]+16*ux0,a[1]+16*uy0)]+draw_pts[1:-1]+[tip_back]
         for pa,pb in zip(draw_pts,draw_pts[1:]): c.line(*pa,*pb)
         c.setDash()
         if t in ('gen','real'):
@@ -378,122 +598,133 @@ def uml(nodes,edges,path):
             p.lineTo(tip[0]-12*ux+5.5*vx,tip[1]-12*uy+5.5*vy)
             p.lineTo(tip[0]-12*ux-5.5*vx,tip[1]-12*uy-5.5*vy); p.close()
             c.setFillColor(white); c.drawPath(p,fill=1,stroke=1)
-        elif t=='aggregate':
-            dx=points[1][0]-a[0]; dy=points[1][1]-a[1]; length=math.hypot(dx,dy) or 1
-            ux,uy=dx/length,dy/length; vx,vy=-uy,ux
+        elif t in ('aggregate','compose'):
+            dx0=points[1][0]-a[0]; dy0=points[1][1]-a[1]; length=math.hypot(dx0,dy0) or 1
+            ux0,uy0=dx0/length,dy0/length; vx0,vy0=-uy0,ux0
             p=c.beginPath(); p.moveTo(*a)
-            p.lineTo(a[0]+6*ux+3*vx,a[1]+6*uy+3*vy); p.lineTo(a[0]+12*ux,a[1]+12*uy)
-            p.lineTo(a[0]+6*ux-3*vx,a[1]+6*uy-3*vy); p.close()
-            c.setFillColor(white); c.drawPath(p,fill=1,stroke=1)
-            c.setFont('Helvetica',8); c.drawString(b[0]+5,b[1]-12,'0..*')
+            p.lineTo(a[0]+8*ux0+5*vx0,a[1]+8*uy0+5*vy0)
+            p.lineTo(a[0]+16*ux0,a[1]+16*uy0)
+            p.lineTo(a[0]+8*ux0-5*vx0,a[1]+8*uy0-5*vy0); p.close()
+            c.setFillColor(HexColor('#17212E') if t=='compose' else white)
+            c.drawPath(p,fill=1,stroke=1)
+            c.setStrokeColor(HexColor('#17212E'))
+            c.line(*b,b[0]-11*ux+4.5*vx,b[1]-11*uy+4.5*vy)
+            c.line(*b,b[0]-11*ux-4.5*vx,b[1]-11*uy-4.5*vy)
+            if t=='aggregate':
+                c.setFont('Helvetica',8); c.drawString(b[0]+5,b[1]-12,'0..*')
         else:
             c.line(*b,b[0]-11*ux+4.5*vx,b[1]-11*uy+4.5*vy)
             c.line(*b,b[0]-11*ux-4.5*vx,b[1]-11*uy-4.5*vy)
-    c.setLineWidth(1.25)
-    for (name,members,col,row,kind),(x,y,w,h) in zip(nodes,boxes):
-        c.setFillColor(white); c.rect(x,y-h,w,h,fill=1,stroke=1)
-        c.setFillColor(HexColor('#DFE5F0' if kind=='interface' else '#EBEEF4'))
-        c.rect(x,y-20,w,20,fill=1,stroke=0)
-        c.setStrokeColor(HexColor('#17212E')); c.line(x,y-20,x+w,y-20)
-        label=('<<interface>> ' if kind=='interface' else '')+name
-        c.setFillColor(HexColor(INK))
-        c.setFont('Helvetica-BoldOblique' if kind=='abstract' else 'Helvetica-Bold',
-                  min(10,(w-10)/(max(len(label),1)*.54)))
-        c.drawCentredString(x+w/2,y-13,label)
-        attrs=[s for s in members.split('\n') if '(' not in s]
-        ops=[s for s in members.split('\n') if '(' in s]
-        yy=y-31; c.setFont('Courier',8.5)
-        for s in attrs: c.drawString(x+5,yy,s); yy-=11
-        c.line(x,yy+6,x+w,yy+6)
-        for s in ops:
-            size=min(8.5,(w-12)/(max(len(s),1)*.55)); c.setFont('Courier',size)
-            c.drawString(x+5,yy-4,s)
-            if '{static}' in s:
-                c.line(x+5,yy-6,x+5+pdfmetrics.stringWidth(s,'Courier',size),yy-6)
-            yy-=11
     c.save()
     doc=pymupdf.open(stream=buf.getvalue(),filetype='pdf')
     doc[0].get_pixmap(matrix=pymupdf.Matrix(2,2)).save(path)
 
 # Sample-style layouts: siblings share a row under their parent.
-# Factory Method — before matches sample (client to concretes); after is creator/product trees.
+# Every before/after diagram keeps an explicit Client showing what caller code depends on.
+# Factory — Client + TransportFactory (local Factory Pattern Infographic).
 d=DATA[1]
-d['pnodes']=[n('Logistics','+ planDelivery()',1,0),n('Truck','+ deliver()',0,1),n('Ship','+ deliver()',2,1)]
-d['pedges']=[(0,1,'dep'),(0,2,'dep')]
+d['pnodes']=[n('Client','+ run()',1,0),n('Plane','+ fly()',0,1),n('Truck','+ drive()',1,1),n('Ship','+ sail()',2,1)]
+d['pedges']=[(0,1,'dep'),(0,2,'dep'),(0,3,'dep')]
 d['snodes']=[
-    n('Logistics','+ planDelivery()\n+ createTransport(): Transport',0.5,0,'abstract'),
-    n('Transport','+ deliver()',2.5,0,'interface'),
-    n('RoadLogistics','+ createTransport(): Transport',0,1),
-    n('SeaLogistics','+ createTransport(): Transport',1,1),
-    n('Truck','+ deliver()',2,1),
-    n('Ship','+ deliver()',3,1)]
-d['sedges']=[(2,0,'gen'),(3,0,'gen'),(0,1,'dep'),(4,1,'real'),(5,1,'real')]
-# Abstract Factory — website furniture families; every sibling pair sits side-by-side
-# under its interface (same organization as the local abstractfactory.png sample).
+    n('Client','+ run()',0,0),
+    n('TransportFactory','+ create(type: String): Transport',1,0),
+    n('Transport','+ transport()',2.5,0,'interface'),
+    n('Plane','+ transport()',1,1),
+    n('Truck','+ transport()',2,1),
+    n('Ship','+ transport()',3,1)]
+d['sedges']=[(0,1,'dep'),(1,2,'dep'),(3,2,'real'),(4,2,'real'),(5,2,'real')]
+# Abstract Factory — each product its own box; methods only on interfaces.
 d=DATA[2]
-d['pnodes']=[n('Shop','+ furnish()',1,0),n('ModernChair','+ sitOn()',0,1),n('VictorianSofa','+ lieOn()',2,1)]
-d['pedges']=[(0,1,'dep'),(0,2,'dep')]
+d['pnodes']=[
+    n('Client','',1.5,1),
+    n('UPSPlane','',0,0),n('UPSTruck','',1.5,0),n('UPSShip','',3,0),
+    n('DHLPlane','',0,2),n('DHLTruck','',1.5,2),n('DHLShip','',3,2)]
+d['pedges']=[(0,1,'dep'),(0,2,'dep'),(0,3,'dep'),(0,4,'dep'),(0,5,'dep'),(0,6,'dep')]
 d['snodes']=[
-    n('FurnitureFactory','+ createChair(): Chair\n+ createSofa(): Sofa',0.5,0,'interface'),
-    n('ModernFactory','+ createChair(): Chair\n+ createSofa(): Sofa',0,1),
-    n('VictorianFactory','+ createChair(): Chair\n+ createSofa(): Sofa',1,1),
-    n('Chair','+ sitOn()',2.5,0,'interface'),
-    n('ModernChair','+ sitOn()',2,1),
-    n('VictorianChair','+ sitOn()',3,1),
-    n('Sofa','+ lieOn()',4.5,0,'interface'),
-    n('ModernSofa','+ lieOn()',4,1),
-    n('VictorianSofa','+ lieOn()',5,1)]
-d['sedges']=[(1,0,'real'),(2,0,'real'),(4,3,'real'),(5,3,'real'),(7,6,'real'),(8,6,'real')]
-# Bridge — shape and color hierarchies side-by-side under each root.
-d=DATA[5]
-d['snodes']=[
-    n('Shape','- color: Color\n+ draw() {abstract}',0.5,0,'abstract'),
-    n('Color','+ apply()',2.5,0,'interface'),
-    n('Circle','+ draw()',0,1),
-    n('Square','+ draw()',1,1),
-    n('Red','+ apply()',2,1),
-    n('Blue','+ apply()',3,1)]
-d['sedges']=[(0,1,'assoc'),(2,0,'gen'),(3,0,'gen'),(4,1,'real'),(5,1,'real')]
-# Adapter — vertical interface stack; library beside the adapter (sample style).
+    n('Client','',0,1),
+    n('UPSFactory','',1,0),
+    n('TransportFactory','+ createPlane()\n+ createShip()\n+ createTruck()',1,1,'interface'),
+    n('DHLFactory','',1,2),
+    n('UPSPlane','',2.2,0),n('UPSTruck','',2.9,0),n('UPSShip','',3.6,0),
+    n('Transport','+ transport()',2.9,1,'interface'),
+    n('DHLPlane','',2.2,2),n('DHLTruck','',2.9,2),n('DHLShip','',3.6,2)]
+d['sedges']=[(0,1,'dep'),(0,3,'dep'),
+             (1,2,'real'),(3,2,'real'),
+             (4,7,'real'),(5,7,'real'),(6,7,'real'),(8,7,'real'),(9,7,'real'),(10,7,'real'),
+             (1,4,'assoc'),(1,5,'assoc'),(1,6,'assoc'),
+             (3,8,'assoc'),(3,9,'assoc'),(3,10,'assoc')]
+# Adapter — inherits AnalyticsService; composes JsonAnalyticsLibrary.
 d=DATA[4]
 d['snodes']=[
-    n('StockApplication','- analytics: AnalyticsService\n+ analyzeStocks()',0,0),
-    n('AnalyticsService','+ analyze(xml): Report',2,0,'interface'),
-    n('XmlAnalyticsAdapter','- library: JsonAnalyticsLibrary\n+ analyze(xml): Report',2,1),
-    n('JsonAnalyticsLibrary','+ analyze(json): Report',0,1)]
-d['sedges']=[(0,1,'assoc'),(2,1,'real'),(2,3,'assoc')]
-# Proxy — interface on top; proxy and real service side-by-side (sample style).
+    n('Client','- analytics: AnalyticsService\n+ analyzeStocks()',0,0),
+    n('AnalyticsService','+ analyze(xml): Report {abstract}',1.5,0,'abstract'),
+    n('XmlAnalyticsAdapter','- library: JsonAnalyticsLibrary\n+ analyze(xml): Report\n- convert(xml): JSON',1.5,1),
+    n('JsonAnalyticsLibrary','+ analyze(json): Report',3.2,1)]
+d['sedges']=[(0,1,'assoc'),(2,1,'gen'),(2,3,'compose')]
+# Bridge — Client under combo classes in problem; Shape composes Color in solution.
+d=DATA[5]
+d['pnodes']=[
+    n('RedCircle','+ draw()',0,0),n('BlueCircle','+ draw()',1.2,0),n('RedSquare','+ draw()',2.4,0),
+    n('Client','+ render()',1.2,1)]
+d['pedges']=[(3,0,'dep'),(3,1,'dep'),(3,2,'dep')]
+d['snodes']=[
+    n('Client','+ render()',0,0),
+    n('Shape','- color: Color\n+ draw() {abstract}',1.2,0,'abstract'),
+    n('Color','+ apply()',3.2,0,'interface'),
+    n('Circle','+ draw()',0.7,1),
+    n('Square','+ draw()',1.7,1),
+    n('Red','+ apply()',2.7,1),
+    n('Blue','+ apply()',3.7,1)]
+d['sedges']=[(0,1,'dep'),(1,2,'compose'),(3,1,'gen'),(4,1,'gen'),(5,2,'real'),(6,2,'real')]
+# Proxy — local Access Control Infographic: Client → DatabaseProxy; shared DatabaseService.
 d=DATA[7]
+d['pnodes']=[n('Client','+ run()',0,0),n('ExpensiveDatabaseService','+ ExpensiveDatabaseService()\n+ query(key): Result',2,1)]
+d['pedges']=[(0,1,'dep')]
 d['snodes']=[
-    n('VideoManager','- service: VideoService\n+ play(id)',0,0),
-    n('VideoService','+ downloadVideo(id): Video',1.5,0,'interface'),
-    n('CachedVideoProxy','- real: VideoService\n- cache: Map\n+ downloadVideo(id): Video',0.5,1),
-    n('ThirdPartyVideoService','+ downloadVideo(id): Video',2.5,1)]
-d['sedges']=[(0,1,'assoc'),(2,1,'real'),(3,1,'real'),(2,3,'assoc')]
-# Strategy / State — concrete strategies share one row under the interface.
-d=DATA[10]
+    n('Client','+ run()',0,0),
+    n('DatabaseService','+ query(key: String): Result',1.5,0,'interface'),
+    n('DatabaseProxy','- realService: DatabaseService\n- cache: Map\n+ query(key): Result\n- getRealService()',0.5,1),
+    n('RealDatabaseService','+ query(key): Result',2.5,1)]
+d['sedges']=[(0,2,'dep'),(2,1,'real'),(3,1,'real'),(2,3,'assoc')]
+# Composite — Client|OrderItem on top (wide gap); children only under OrderItem.
+d=DATA[8]
+d['pnodes']=[
+    n('Client','+ total(box)',1,0),
+    n('Product','+ price: Money',0.5,1),n('Box','+ contents: List',1.5,1)]
+d['pedges']=[(0,1,'dep'),(0,2,'dep')]
 d['snodes']=[
-    n('Navigator','- strategy: RouteStrategy\n+ setStrategy(s)\n+ buildRoute(a, b): Route',0,0),
-    n('RouteStrategy','+ buildRoute(a, b): Route',2,0,'interface'),
-    n('RoadRoute','+ buildRoute(a, b): Route',1,1),
-    n('WalkingRoute','+ buildRoute(a, b): Route',2,1),
-    n('TransitRoute','+ buildRoute(a, b): Route',3,1)]
-d['sedges']=[(0,1,'assoc'),(2,1,'real'),(3,1,'real'),(4,1,'real')]
-d=DATA[11]
-d['snodes']=[
-    n('Document','- state: PublicationState\n+ publish(user)\n+ changeState(s)',0,0),
-    n('PublicationState','+ publish(doc, user)',2,0,'interface'),
-    n('Draft','+ publish(doc, user)',1,1),
-    n('Moderation','+ publish(doc, user)',2,1),
-    n('Published','+ publish(doc, user)',3,1)]
-d['sedges']=[(0,1,'assoc'),(2,1,'real'),(3,1,'real'),(4,1,'real')]
-# Template Method — subclasses side-by-side under the abstract miner.
+    n('Client','+ total(item)',0,0),
+    n('OrderItem','+ getPrice(): Money',2.2,0,'interface'),
+    n('Product','- price: Money\n+ getPrice(): Money',1.6,1.25),
+    n('Box','- children: OrderItem[0..*]\n+ getPrice(): Money\n+ add(item)',2.8,1.25)]
+d['sedges']=[(0,1,'dep'),(2,1,'real'),(3,1,'real'),(3,1,'aggregate')]
+# Template Method — Client uses DataMiner; subclasses side-by-side.
 d=DATA[9]
 d['snodes']=[
-    n('DataMiner','+ mine(path): Report\n# extract(path): Data {abstract}\n# analyze(data): Report',1,0,'abstract'),
-    n('PdfMiner','# extract(path): Data',0,1),
-    n('CsvMiner','# extract(path): Data',2,1)]
-d['sedges']=[(1,0,'gen'),(2,0,'gen')]
+    n('Client','+ run()',0,0),
+    n('DataMiner','+ mine(path): Report\n# extract(path): Data {abstract}\n# analyze(data): Report',1.5,0,'abstract'),
+    n('PdfMiner','# extract(path): Data',1,1),
+    n('CsvMiner','# extract(path): Data',2.5,1)]
+d['sedges']=[(0,1,'dep'),(2,1,'gen'),(3,1,'gen')]
+# Strategy / State — Client uses the context; concretes share one row under the interface.
+d=DATA[10]
+d['snodes']=[
+    n('Client','+ navigate()',0,0),
+    n('Navigator','- strategy: RouteStrategy\n+ setStrategy(s)\n+ buildRoute(a, b): Route',1,0),
+    n('RouteStrategy','+ buildRoute(a, b): Route',2.5,0,'interface'),
+    n('RoadRoute','+ buildRoute(a, b): Route',1.5,1),
+    n('WalkingRoute','+ buildRoute(a, b): Route',2.5,1),
+    n('TransitRoute','+ buildRoute(a, b): Route',3.5,1)]
+d['sedges']=[(0,1,'dep'),(1,2,'assoc'),(3,2,'real'),(4,2,'real'),(5,2,'real')]
+d=DATA[11]
+d['snodes']=[
+    n('Client','+ publishDoc()',0,0),
+    n('Document','- state: PublicationState\n+ publish(user)\n+ changeState(s)',1,0),
+    n('PublicationState','+ publish(doc, user)',2.5,0,'interface'),
+    n('Draft','+ publish(doc, user)',1.5,1),
+    n('Moderation','+ publish(doc, user)',2.5,1),
+    n('Published','+ publish(doc, user)',3.5,1)]
+d['sedges']=[(0,1,'dep'),(1,2,'assoc'),(3,2,'real'),(4,2,'real'),(5,2,'real')]
 
 def wrap(text,font,size,width):
     result=[]
@@ -543,8 +774,12 @@ def tokenize_pseudo(line):
 
 W,H=1440,810
 PDF=canvas.Canvas(str(OUT/'Design Patterns.pdf'),pagesize=(W,H))
+PDF.setTitle('Design Patterns')
+PDF.setSubject('Cover plus 14 creational, structural, and behavioral design pattern slides')
 SLIDES=[]
-for idx,d in enumerate(DATA):
+PAGE_META=[]  # (kind, title, category?) for bookmarks / HTML
+
+def begin_page():
     elements=[]
     def rect(x,y,w,h,fill):
         PDF.setFillColor(HexColor(fill));PDF.rect(x,H-y-h,w,h,fill=1,stroke=0);elements.append(('rect',x,y,w,h,fill))
@@ -563,6 +798,39 @@ for idx,d in enumerate(DATA):
                 cx+=pdfmetrics.stringWidth(tok,'Courier',size)
         elements.append(('code',x,y,w,len(lines)*leading,s,size,'Courier',leading))
         return y+len(lines)*leading
+    return elements,rect,text,code
+
+# Cover: how to read the deck and why patterns exist (client / module DX).
+elements,rect,text,code=begin_page()
+rect(0,0,W,H,'#FFFFFF')
+rect(0,0,W,8,'#0F766E')
+text('Design Patterns',48,36,900,48,'#101319',font='Helvetica-Bold')
+text('Creational · Structural · Behavioral',48,96,900,18,'#596273')
+text('Modules built for another developer’s client code',48,124,1100,22,'#182230')
+rect(48,168,1344,2,'#D0D7E2')
+y=188
+y=text('Purpose',48,y,600,22,'#0F766E',font='Helvetica-Bold')+8
+y=text('Patterns are shared answers to recurring design pressures. They help you shape module boundaries so callers get a calm, intention-revealing API while the module stays free to grow, swap internals, or add variants without rewriting every consumer.',48,y,1344,16,'#192331',leading=22)+14
+y=text('Developer experience goal',48,y,600,22,'#0F766E',font='Helvetica-Bold')+8
+y=text('Treat each slide as a handover story: you own the module; another developer owns the client. Good patterns make that handover kind—small surface area, clear abstractions, and room to extend the module graciously so clients keep writing the same simple calls.',48,y,1344,16,'#192331',leading=22)+14
+y=text('How to read each pattern slide',48,y,600,22,'#0F766E',font='Helvetica-Bold')+10
+for label,body in [
+    ('Problem / Solution','Why the current shape hurts, and what the pattern changes about dependencies and responsibilities.'),
+    ('Before / After UML','Always includes a Client box. Follow dashed arrows from Client to see what caller code must know. After should depend on a narrow API, not a pile of concretes.'),
+    ('Client Code','How the other developer uses (or is forced to misuse) your module.'),
+    ('Module Code','The API boundary you hand over—the implementation clients should not need to reopen when requirements grow.'),
+]:
+    text(label,48,y,220,15,'#151B27',font='Helvetica-Bold')
+    y=text(body,280,y,1112,15,'#192331',leading=20)+8
+rect(48,H-88,1344,48,'#EDF0F6')
+text('Look for fewer Client dependencies after the pattern, and for module code that stays easy to use while remaining easy to extend.',64,H-74,1312,15,'#374151')
+PDF.bookmarkPage('cover')
+PDF.addOutlineEntry('Cover — How to read', 'cover', 0, closed=0)
+PDF.showPage(); SLIDES.append(elements); PAGE_META.append(('cover','Cover — How to read',None))
+
+last_category=None
+for idx,d in enumerate(DATA):
+    elements,rect,text,code=begin_page()
     rect(0,0,W,H,'#FFFFFF')
     title_size=44 if len(d['title'])<15 else 39
     text(d['title'],24,9,460,title_size,'#101319',font='Helvetica-Bold')
@@ -573,39 +841,129 @@ for idx,d in enumerate(DATA):
     rect(24,76,1392,24,'#EDF0F6')
     text('CASE STUDY: '+d['case'],34,79,1250,13,'#374151',font='Helvetica-Bold')
     text(f'{idx+1:02d} / 14',1340,79,75,13,'#374151',font='Helvetica-Bold')
+    no_module=d['title'] in ('Abstract Factory','Builder')
+    bullet_ps='\n' in d['problem'] or '\n' in d['solution']
+    # Compact problem/solution + UML on every slide so code panels get the height.
+    if bullet_ps:
+        panel_h,body_size,body_lead,body_y=82,10,12,130
+    else:
+        panel_h,body_size,body_lead,body_y=52,12,14,126
+    code_bottom=H-26
+    code_top=428
+    uml_top=109+panel_h+6
+    uml_h=code_top-uml_top-8
+    uml_img_y=uml_top+28
+    uml_img_h=uml_h-32
     for side,x,col,key in [('Problem',24,'#C5222B','problem'),('Solution',732,'#007E78','solution')]:
-        rect(x,109,684,82,'#EFA5AA' if key=='problem' else '#94D9D1')
-        rect(x+2,111,680,78,'#FFE2E3' if key=='problem' else '#D9F5F0')
-        rect(x+10,118,5,24,col)
-        text(side,x+23,114,642,25,col,font='Helvetica-Bold')
-        text(d[key],x+17,151,650,17,'#192331',leading=20)
-        rect(x,200,684,284,'#DFE3EC')
-        rect(x+2,202,680,280,'#FFFFFF')
-        rect(x+2,202,680,29,'#E4E7F0')
+        rect(x,109,684,panel_h,'#EFA5AA' if key=='problem' else '#94D9D1')
+        rect(x+2,111,680,panel_h-4,'#FFE2E3' if key=='problem' else '#D9F5F0')
+        rect(x+10,116,5,18,col)
+        text(side,x+23,112,642,16,col,font='Helvetica-Bold')
+        text(d[key],x+17,body_y,650,body_size,'#192331',leading=body_lead)
+        rect(x,uml_top,684,uml_h,'#DFE3EC')
+        rect(x+2,uml_top+2,680,uml_h-4,'#FFFFFF')
+        rect(x+2,uml_top+2,680,24,'#E4E7F0')
         label='Before (direct coupling)' if key=='problem' else 'After (using '+d['title']+')'
-        text(label,x+12,205,660,18,'#151B27',font='Helvetica-Bold')
+        text(label,x+12,uml_top+3,660,13,'#151B27',font='Helvetica-Bold')
         imagepath=OUT/f'{idx+1:02d}-{key}.png'
-        uml(d['pnodes' if key=='problem' else 'snodes'],d['pedges' if key=='problem' else 'sedges'],str(imagepath))
-        PDF.drawImage(str(imagepath),x+11,H-234-247,660,247)
-        elements.append(('image',x+11,234,660,247,str(imagepath)))
-    for x,label,src in [(24,'Client Code (Before)',d['before']),(732,'Client Code (After)',d['after'])]:
-        rect(x,494,684,140,'#DFE3EC')
-        rect(x+2,496,680,136,'#F8F9FC')
-        rect(x+2,496,680,28,'#E4E7F0')
-        text(label,x+12,499,550,17,'#161D2B',font='Helvetica-Bold')
-        text('Pseudocode',x+574,502,100,11,'#667085')
-        code(src,x+14,533,650,16,21)
-    rect(24,645,1392,130,'#DFE3EC')
-    rect(26,647,1388,126,'#F8F9FC')
-    rect(26,647,1388,27,'#E4E7F0')
-    text('Key Implementation / Notable Module',36,650,1200,17,'#161D2B',font='Helvetica-Bold')
-    text('Pseudocode',1296,653,105,11,'#667085')
-    code(d['module'],38,682,1364,15,17)
+        uml(d['pnodes' if key=='problem' else 'snodes'],d['pedges' if key=='problem' else 'sedges'],str(imagepath),compact=True)
+        PDF.drawImage(str(imagepath),x+11,H-uml_img_y-uml_img_h,660,uml_img_h)
+        elements.append(('image',x+11,uml_img_y,660,uml_img_h,str(imagepath)))
+    module_in_solution=d['title'] in ('Factory Method','Proxy')
+    code_area=code_bottom-code_top
+    if no_module:
+        # Client before/after only — full-height panels (Builder / Abstract Factory).
+        csize,clead=(13,16) if d['title']=='Builder' else (13,16)
+        for x,label,src in [(24,'Client Code (Before)',d['before']),(732,'Client Code (After)',d['after'])]:
+            rect(x,code_top,684,code_area,'#DFE3EC')
+            rect(x+2,code_top+2,680,code_area-4,'#F8F9FC')
+            rect(x+2,code_top+2,680,24,'#E4E7F0')
+            text(label,x+12,code_top+3,550,14,'#161D2B',font='Helvetica-Bold')
+            text('Pseudocode',x+574,code_top+6,100,10,'#667085')
+            code(src,x+14,code_top+30,650,csize,clead)
+    elif d['title']=='Singleton':
+        # Service before/after side-by-side; taller full-width module (Config API).
+        svc_h=112
+        mod_y=code_top+svc_h+6
+        mod_h=code_bottom-mod_y
+        for x,label,src in [(24,'Service Code (Before)',d['before']),(732,'Service Code (After)',d['after'])]:
+            rect(x,code_top,684,svc_h,'#DFE3EC')
+            rect(x+2,code_top+2,680,svc_h-4,'#F8F9FC')
+            rect(x+2,code_top+2,680,24,'#E4E7F0')
+            text(label,x+12,code_top+3,550,14,'#161D2B',font='Helvetica-Bold')
+            text('Pseudocode',x+574,code_top+6,100,10,'#667085')
+            code(src,x+14,code_top+28,650,13,16)
+        rect(24,mod_y,1392,mod_h,'#DFE3EC')
+        rect(26,mod_y+2,1388,mod_h-4,'#F8F9FC')
+        rect(26,mod_y+2,1388,24,'#E4E7F0')
+        text('Module Code (API boundary)',36,mod_y+4,1200,15,'#161D2B',font='Helvetica-Bold')
+        text('Pseudocode',1296,mod_y+7,105,10,'#667085')
+        code(d['module'],38,mod_y+30,1364,14,17)
+    elif module_in_solution:
+        # Before fills the left; after + module stack on the solution half.
+        before_h=code_area
+        after_h=int(code_area*0.52) if d['title']=='Builder' else int(code_area*0.40)
+        mod_y=code_top+after_h+6
+        mod_h=code_bottom-mod_y
+        rect(24,code_top,684,before_h,'#DFE3EC')
+        rect(26,code_top+2,680,before_h-4,'#F8F9FC')
+        rect(26,code_top+2,680,24,'#E4E7F0')
+        text('Client Code (Before)',36,code_top+3,550,14,'#161D2B',font='Helvetica-Bold')
+        text('Pseudocode',598,code_top+6,100,10,'#667085')
+        code(d['before'],38,code_top+28,650,13 if d['title']=='Builder' else 14,16 if d['title']=='Builder' else 17)
+        rect(732,code_top,684,after_h,'#DFE3EC')
+        rect(734,code_top+2,680,after_h-4,'#F8F9FC')
+        rect(734,code_top+2,680,24,'#E4E7F0')
+        text('Client Code (After)',744,code_top+3,550,14,'#161D2B',font='Helvetica-Bold')
+        text('Pseudocode',1306,code_top+6,100,10,'#667085')
+        code(d['after'],746,code_top+28,650,12 if d['title']=='Builder' else 13,15 if d['title']=='Builder' else 16)
+        rect(732,mod_y,684,mod_h,'#DFE3EC')
+        rect(734,mod_y+2,680,mod_h-4,'#F8F9FC')
+        rect(734,mod_y+2,680,24,'#E4E7F0')
+        text('Module Code (API boundary)',744,mod_y+4,520,14,'#161D2B',font='Helvetica-Bold')
+        text('Pseudocode',1306,mod_y+7,100,10,'#667085')
+        code(d['module'],746,mod_y+28,650,12,15)
+    else:
+        svc_h=int(code_area*0.42)
+        mod_y=code_top+svc_h+6
+        mod_h=code_bottom-mod_y
+        for x,label,src in [(24,'Client Code (Before)',d['before']),(732,'Client Code (After)',d['after'])]:
+            rect(x,code_top,684,svc_h,'#DFE3EC')
+            rect(x+2,code_top+2,680,svc_h-4,'#F8F9FC')
+            rect(x+2,code_top+2,680,24,'#E4E7F0')
+            text(label,x+12,code_top+3,550,14,'#161D2B',font='Helvetica-Bold')
+            text('Pseudocode',x+574,code_top+6,100,10,'#667085')
+            code(src,x+14,code_top+28,650,13,16)
+        rect(24,mod_y,1392,mod_h,'#DFE3EC')
+        rect(26,mod_y+2,1388,mod_h-4,'#F8F9FC')
+        rect(26,mod_y+2,1388,24,'#E4E7F0')
+        text('Module Code (API boundary)',36,mod_y+4,1200,15,'#161D2B',font='Helvetica-Bold')
+        text('Pseudocode',1296,mod_y+7,105,10,'#667085')
+        code(d['module'],38,mod_y+30,1364,13,16)
     slug=d['title'].lower().replace(' ','-');url='https://refactoring.guru/design-patterns/'+slug;d['url']=url
     text('Source: '+url,24,788,800,10,'#566174')
-    text('UML: hollow triangle = inheritance / realization; dashed open arrow = dependency',840,788,580,10,'#566174')
-    PDF.showPage();SLIDES.append(elements)
+    text('UML: Client box = caller code; hollow triangle = inheritance / realization; dashed open arrow = dependency',720,788,700,10,'#566174')
+    # PDF outline / bookmarks (sidebar TOC in readers). HTML print-to-PDF cannot do this reliably.
+    bookmark=f'p{idx}'
+    PDF.bookmarkPage(bookmark)
+    if d['category']!=last_category:
+        PDF.addOutlineEntry(d['category'],bookmark,0,closed=0)
+        last_category=d['category']
+    PDF.addOutlineEntry(f'{idx+1:02d}. {d["title"]}',bookmark,1,closed=0)
+    PDF.showPage();SLIDES.append(elements); PAGE_META.append(('pattern',d['title'],d['category']))
 PDF.save()
+# Ensure outline is present even if a reader prefers the PyMuPDF TOC form.
+pdf_path=OUT/'Design Patterns.pdf'
+doc=pymupdf.open(pdf_path)
+toc=[[1,'Cover — How to read',1]]; prev=None
+for i,d in enumerate(DATA):
+    page=i+2  # cover is page 1
+    if d['category']!=prev:
+        toc.append([1,d['category'],page]); prev=d['category']
+    toc.append([2,f'{i+1:02d}. {d["title"]}',page])
+doc.set_toc(toc)
+doc.set_metadata({'title':'Design Patterns','subject':'Design pattern slides'})
+doc.saveIncr(); doc.close()
 
 # Minimal standards-based OOXML. Every title, description, code line and
 # caption is a native PowerPoint text run. Only UML is embedded raster media.
@@ -629,11 +987,12 @@ def xmlcode(e,i):
     return f'<p:sp><p:nvSpPr><p:cNvPr id="{i}" name="Code {i}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>{xfrm(x,y,w,h+5)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0"/><a:lstStyle/>{"".join(paragraphs)}</p:txBody></p:sp>'
 def rels(items):return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+''.join(f'<Relationship Id="{i}" Type="{R}/{typ}" Target="{target}"/>' for i,typ,target in items)+'</Relationships>'
 group='<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>'
+N_SLIDES=len(SLIDES); MASTER_RID=f'rId{N_SLIDES+1}'
 with zipfile.ZipFile(OUT/'Design Patterns.pptx','w',zipfile.ZIP_DEFLATED) as z:
     z.writestr('_rels/.rels',rels([('rId1','officeDocument','ppt/presentation.xml')]))
-    slideids=''.join(f'<p:sldId id="{255+i}" r:id="rId{i}"/>' for i in range(1,15))
-    z.writestr('ppt/presentation.xml',f'<p:presentation xmlns:p="{NS}" xmlns:a="{A}" xmlns:r="{R}"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId15"/></p:sldMasterIdLst><p:sldIdLst>{slideids}</p:sldIdLst><p:sldSz cx="{emu(W)}" cy="{emu(H)}"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>')
-    z.writestr('ppt/_rels/presentation.xml.rels',rels([(f'rId{i}','slide',f'slides/slide{i}.xml') for i in range(1,15)]+[('rId15','slideMaster','slideMasters/slideMaster1.xml')]))
+    slideids=''.join(f'<p:sldId id="{255+i}" r:id="rId{i}"/>' for i in range(1,N_SLIDES+1))
+    z.writestr('ppt/presentation.xml',f'<p:presentation xmlns:p="{NS}" xmlns:a="{A}" xmlns:r="{R}"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="{MASTER_RID}"/></p:sldMasterIdLst><p:sldIdLst>{slideids}</p:sldIdLst><p:sldSz cx="{emu(W)}" cy="{emu(H)}"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>')
+    z.writestr('ppt/_rels/presentation.xml.rels',rels([(f'rId{i}','slide',f'slides/slide{i}.xml') for i in range(1,N_SLIDES+1)]+[(MASTER_RID,'slideMaster','slideMasters/slideMaster1.xml')]))
     z.writestr('ppt/slideMasters/slideMaster1.xml',f'<p:sldMaster xmlns:p="{NS}" xmlns:a="{A}" xmlns:r="{R}"><p:cSld><p:spTree>{group}</p:spTree></p:cSld><p:clrMap accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" bg1="lt1" bg2="lt2" folHlink="folHlink" hlink="hlink" tx1="dk1" tx2="dk2"/><p:sldLayoutIdLst><p:sldLayoutId id="1" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles/></p:sldMaster>')
     z.writestr('ppt/slideMasters/_rels/slideMaster1.xml.rels',rels([('rId1','slideLayout','../slideLayouts/slideLayout1.xml')]))
     z.writestr('ppt/slideLayouts/slideLayout1.xml',f'<p:sldLayout xmlns:p="{NS}" xmlns:a="{A}" xmlns:r="{R}" type="blank"><p:cSld name="Blank"><p:spTree>{group}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>')
@@ -655,9 +1014,10 @@ with zipfile.ZipFile(OUT/'Design Patterns.pptx','w',zipfile.ZIP_DEFLATED) as z:
     z.writestr('[Content_Types].xml','<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/>'+''.join(f'<Override PartName="{part}" ContentType="{ct}"/>' for part,ct in overrides)+'</Types>')
 
 # Self-contained printable HTML, with selectable text and embedded UML only.
+# Bookmarks: browser Print→PDF does not reliably create a PDF outline. Use Download PDF.
 import base64
 pages=[]
-for elements in SLIDES:
+for elements,meta in zip(SLIDES,PAGE_META):
     parts=[]
     for e in elements:
         typ,x,y,w,h,*r=e;style=f'position:absolute;left:{x}px;top:{y}px;width:{w}px;height:{h}px;'
@@ -673,7 +1033,34 @@ for elements in SLIDES:
         else:
             s,size,color,font,leading=r;family='Courier New' if font=='Courier' else 'Arial';weight='bold' if font.endswith('Bold') else 'normal'
             lines=wrap(s,font,size,w);parts.append(f'<div style="{style}font-family:{family};font-size:{size}px;line-height:{leading}px;color:{color};font-weight:{weight};white-space:pre;">{html.escape(chr(10).join(lines))}</div>')
-    pages.append('<section>'+''.join(parts)+'</section>')
-(OUT/'Design Patterns.html').write_text('<!doctype html><html><head><meta charset="utf-8"><title>Design Patterns</title><style>@page{size:15in 8.4375in;margin:0}*{box-sizing:border-box}body{margin:0;background:#cbd5e1}section{position:relative;width:1440px;height:810px;background:white;break-after:page;margin:20px auto}@media print{body{background:white}section{margin:0}}</style></head><body>'+''.join(pages)+'</body></html>',encoding='utf-8')
+    title=meta[1]; slug=title.lower().replace(' ','-').replace('—','-').replace(',','')
+    pages.append(f'<section id="{html.escape(slug)}" aria-label="{html.escape(title)}"><h1 class="slide-title">{html.escape(title)}</h1>'+''.join(parts)+'</section>')
+toolbar=(''
+    '<header class="toolbar" role="banner">'
+    '<strong>Design Patterns</strong>'
+    '<span class="hint">Bookmarks ship in the PDF download — browser Print→PDF usually omits them.</span>'
+    '<a class="btn" href="Design%20Patterns.pdf" download="Design Patterns.pdf">Download PDF</a>'
+    '<button class="btn secondary" type="button" onclick="window.print()">Print</button>'
+    '</header>')
+css=(''
+    '@page{size:15in 8.4375in;margin:0}'
+    '*{box-sizing:border-box}'
+    'body{margin:0;background:#cbd5e1;font-family:Arial,sans-serif}'
+    '.toolbar{position:sticky;top:0;z-index:20;display:flex;gap:12px;align-items:center;flex-wrap:wrap;'
+    'padding:10px 18px;background:#182230;color:#F8FAFC;box-shadow:0 1px 0 rgba(0,0,0,.2)}'
+    '.toolbar .hint{flex:1;min-width:200px;font-size:13px;color:#CBD5E1}'
+    '.toolbar .btn{appearance:none;border:0;border-radius:6px;padding:8px 14px;background:#0F766E;color:white;'
+    'font:600 14px Arial,sans-serif;text-decoration:none;cursor:pointer}'
+    '.toolbar .btn.secondary{background:#334155}'
+    '.toolbar .btn:hover{filter:brightness(1.08)}'
+    'section{position:relative;width:1440px;height:810px;background:white;break-after:page;margin:20px auto;'
+    'overflow:hidden}'
+    'h1.slide-title{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;'
+    'clip:rect(0,0,0,0);white-space:nowrap;border:0}'
+    '@media print{body{background:white}.toolbar{display:none}section{margin:0}}')
+(OUT/'Design Patterns.html').write_text(
+    '<!doctype html><html><head><meta charset="utf-8"><title>Design Patterns</title>'
+    f'<style>{css}</style></head><body>{toolbar}{"".join(pages)}</body></html>',
+    encoding='utf-8')
 (OUT/'content.json').write_text(json.dumps(DATA,indent=2),encoding='utf-8')
-print('Created 14-slide PPTX, PDF, and HTML in',OUT)
+print(f'Created {N_SLIDES}-slide PPTX, PDF (with bookmarks), and HTML in',OUT)

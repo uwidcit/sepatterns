@@ -2,26 +2,61 @@
   {
     "title": "Singleton",
     "category": "Creational",
-    "case": "Shared database connection",
-    "desc": "Provide one shared instance through a controlled access point.",
-    "problem": "Independent callers create separate database connections.",
-    "solution": "Hide construction; return the same instance to every caller.",
-    "before": "a = new Database()\nb = new Database()\na.query(sql)\n// a and b are different objects",
-    "after": "a = Database.getInstance()\nb = Database.getInstance()\na.query(sql)\nassert a is b",
-    "module": "// Database: lazy, thread-safe accessor\nstatic synchronized getInstance():\n    if instance == null: instance = new Database()\n    return instance",
+    "case": "Shared Config across services",
+    "desc": "Ensures a class has only one instance and provides a global point of access to it.",
+    "problem": "\u2022 User drives UserService / OrderService / ReportService; each needs Config.\n\u2022 Call order is not fixed\u2014any service may run first.\n\u2022 Each service copies if config == null: config = new Config() \u2192 multiple instances.",
+    "solution": "\u2022 User still calls doWork(); services only call Config.getInstance().\n\u2022 The null-check and construction live once inside Config.\n\u2022 First caller creates it; every service shares that instance.",
+    "before": "// inside each service (User API unchanged)\nif config == null:\n    config = new Config()\nconfig.load()\n// same guard in UserService, OrderService, ReportService",
+    "after": "// inside each service (User API unchanged)\nconfig = Config.getInstance()\nconfig.load()\n// same load; guard moved into Config",
+    "module": "// MODULE \u2014 Config singleton (owns the lazy init)\nprivate static instance\nprivate Config(): load()\nstatic getInstance():\n    if instance == null:\n        instance = new Config()\n    return instance",
     "pnodes": [
       [
-        "Application",
+        "User",
         "+ run()",
-        0,
+        1.2,
         0,
         "class"
       ],
       [
-        "Database",
-        "+ Database()\n+ query(sql)",
-        2,
+        "UserService",
+        "+ doWork()",
+        0,
         1,
+        "class"
+      ],
+      [
+        "OrderService",
+        "+ doWork()",
+        1.2,
+        1,
+        "class"
+      ],
+      [
+        "ReportService",
+        "+ doWork()",
+        2.4,
+        1,
+        "class"
+      ],
+      [
+        "Config #1",
+        "+ load()",
+        0,
+        2,
+        "class"
+      ],
+      [
+        "Config #2",
+        "+ load()",
+        1.2,
+        2,
+        "class"
+      ],
+      [
+        "Config #3",
+        "+ load()",
+        2.4,
+        2,
         "class"
       ]
     ],
@@ -30,21 +65,67 @@
         0,
         1,
         "dep"
+      ],
+      [
+        0,
+        2,
+        "dep"
+      ],
+      [
+        0,
+        3,
+        "dep"
+      ],
+      [
+        1,
+        4,
+        "dep"
+      ],
+      [
+        2,
+        5,
+        "dep"
+      ],
+      [
+        3,
+        6,
+        "dep"
       ]
     ],
     "snodes": [
       [
-        "Application",
+        "User",
         "+ run()",
-        0,
+        1.2,
         0,
         "class"
       ],
       [
-        "Database",
-        "- instance: Database {static}\n- Database()\n+ getInstance(): Database {static}\n+ query(sql)",
-        2,
+        "UserService",
+        "+ doWork()",
+        0,
         1,
+        "class"
+      ],
+      [
+        "OrderService",
+        "+ doWork()",
+        1.2,
+        1,
+        "class"
+      ],
+      [
+        "ReportService",
+        "+ doWork()",
+        2.4,
+        1,
+        "class"
+      ],
+      [
+        "Config",
+        "- instance: Config {static}\n- Config()\n+ getInstance(): Config {static}\n+ load()",
+        1.2,
+        2,
         "class"
       ]
     ],
@@ -52,6 +133,31 @@
       [
         0,
         1,
+        "dep"
+      ],
+      [
+        0,
+        2,
+        "dep"
+      ],
+      [
+        0,
+        3,
+        "dep"
+      ],
+      [
+        1,
+        4,
+        "dep"
+      ],
+      [
+        2,
+        4,
+        "dep"
+      ],
+      [
+        3,
+        4,
         "dep"
       ]
     ],
@@ -61,31 +167,38 @@
   {
     "title": "Factory Method",
     "category": "Creational",
-    "case": "Road and sea logistics",
-    "desc": "Let creator subclasses choose the product used by shared business logic.",
-    "problem": "Logistics constructs concrete transports; each new kind forces edits.",
-    "solution": "Override a creation method while preserving delivery planning.",
-    "before": "truck = new Truck()\nship = new Ship()\ntruck.deliver()\n// every new kind edits Logistics",
-    "after": "logistics = new SeaLogistics()\nlogistics.planDelivery()\n// planning uses Transport",
-    "module": "// Logistics.planDelivery()\nvehicle = createTransport()\nvehicle.deliver()\n// SeaLogistics.createTransport(): return new Ship()",
+    "case": "Plane, truck, and ship transport",
+    "desc": "Provides an interface for creating objects, but lets subclasses decide which class to instantiate.",
+    "problem": "\u2022 Client code needs to create different types of objects (e.g. Plane, Truck, Ship).\n\u2022 The client contains conditional logic and knows about all concrete classes.\n\u2022 Adding a new type requires modifying client code (violates Open/Closed Principle).\n\u2022 Object creation logic is scattered and duplicated across the application.\n\u2022 Client is tightly coupled to concrete classes.",
+    "solution": "\u2022 Define a factory interface/class for creating products (e.g. Transport).\n\u2022 Concrete factory decides which concrete product to instantiate.\n\u2022 Client code works with the factory and the product interface, not concrete classes.\n\u2022 To add a new type, add a new product and update the factory (client code unchanged).\n\u2022 Centralizes and encapsulates object creation logic.",
+    "before": "plane = new Plane(); plane.fly()\ntruck = new Truck(); truck.drive()\nship = new Ship(); ship.sail()\n// three types; three different method names",
+    "after": "fleet = [factory.create(\"plane\"),\n         factory.create(\"truck\"),\n         factory.create(\"ship\")]\nfor t in fleet: t.transport()\n// same three results; one Transport method",
+    "module": "// MODULE \u2014 creation API for client developers\n// TransportFactory.create(type)\nif type == \"plane\": return new Plane()\nelif type == \"truck\": return new Truck()\nelif type == \"ship\": return new Ship()\n// Plane/Truck/Ship implement Transport.transport()",
     "pnodes": [
       [
-        "Logistics",
-        "+ planDelivery()",
+        "Client",
+        "+ run()",
         1,
         0,
         "class"
       ],
       [
-        "Truck",
-        "+ deliver()",
+        "Plane",
+        "+ fly()",
         0,
+        1,
+        "class"
+      ],
+      [
+        "Truck",
+        "+ drive()",
+        1,
         1,
         "class"
       ],
       [
         "Ship",
-        "+ deliver()",
+        "+ sail()",
         2,
         1,
         "class"
@@ -101,47 +214,52 @@
         0,
         2,
         "dep"
+      ],
+      [
+        0,
+        3,
+        "dep"
       ]
     ],
     "snodes": [
       [
-        "Logistics",
-        "+ planDelivery()\n+ createTransport(): Transport",
-        0.5,
+        "Client",
+        "+ run()",
         0,
-        "abstract"
+        0,
+        "class"
+      ],
+      [
+        "TransportFactory",
+        "+ create(type: String): Transport",
+        1,
+        0,
+        "class"
       ],
       [
         "Transport",
-        "+ deliver()",
+        "+ transport()",
         2.5,
         0,
         "interface"
       ],
       [
-        "RoadLogistics",
-        "+ createTransport(): Transport",
-        0,
-        1,
-        "class"
-      ],
-      [
-        "SeaLogistics",
-        "+ createTransport(): Transport",
+        "Plane",
+        "+ transport()",
         1,
         1,
         "class"
       ],
       [
         "Truck",
-        "+ deliver()",
+        "+ transport()",
         2,
         1,
         "class"
       ],
       [
         "Ship",
-        "+ deliver()",
+        "+ transport()",
         3,
         1,
         "class"
@@ -149,28 +267,28 @@
     ],
     "sedges": [
       [
-        2,
-        0,
-        "gen"
-      ],
-      [
-        3,
-        0,
-        "gen"
-      ],
-      [
         0,
         1,
         "dep"
       ],
       [
-        4,
         1,
+        2,
+        "dep"
+      ],
+      [
+        3,
+        2,
+        "real"
+      ],
+      [
+        4,
+        2,
         "real"
       ],
       [
         5,
-        1,
+        2,
         "real"
       ]
     ],
@@ -180,33 +298,61 @@
   {
     "title": "Abstract Factory",
     "category": "Creational",
-    "case": "Matching furniture families",
-    "desc": "Create related products through a family-specific factory.",
-    "problem": "Direct construction can mix modern chairs with Victorian sofas.",
-    "solution": "Select one family factory; request products through interfaces.",
-    "before": "chair = new ModernChair()\nsofa = new VictorianSofa()\n// mismatched furniture family",
-    "after": "factory = new ModernFactory()\nchair = factory.createChair()\nsofa = factory.createSofa()",
-    "module": "// ModernFactory\ncreateChair(): return new ModernChair()\ncreateSofa():  return new ModernSofa()\n// VictorianFactory returns Victorian products",
+    "case": "UPS and DHL transport families",
+    "desc": "Create related product families through a factory interface.",
+    "problem": "Client news every carrier concrete and calls drive / sail / fly separately.",
+    "solution": "Pick a family factory; create as Transport; one transport() loop.",
+    "before": "dt = new DHLTruck(); dt.drive()\nds = new DHLShip();  ds.sail()\ndp = new DHLPlane(); dp.fly()\nut = new UPSTruck(); ut.drive()\nus = new UPSShip();  us.sail()\nup = new UPSPlane(); up.fly()",
+    "after": "dhl = new DHLFactory()\ndp = dhl.createPlane(); ds = dhl.createShip(); dt = dhl.createTruck()\nups = new UPSFactory()\nup = ups.createPlane(); us = ups.createShip(); ut = ups.createTruck()\nfleet = [dp, ds, dt, up, us, ut]\nfor t in fleet: t.transport()",
+    "module": "",
     "pnodes": [
       [
-        "Shop",
-        "+ furnish()",
-        1,
-        0,
-        "class"
-      ],
-      [
-        "ModernChair",
-        "+ sitOn()",
-        0,
+        "Client",
+        "",
+        1.5,
         1,
         "class"
       ],
       [
-        "VictorianSofa",
-        "+ lieOn()",
+        "UPSPlane",
+        "",
+        0,
+        0,
+        "class"
+      ],
+      [
+        "UPSTruck",
+        "",
+        1.5,
+        0,
+        "class"
+      ],
+      [
+        "UPSShip",
+        "",
+        3,
+        0,
+        "class"
+      ],
+      [
+        "DHLPlane",
+        "",
+        0,
         2,
-        1,
+        "class"
+      ],
+      [
+        "DHLTruck",
+        "",
+        1.5,
+        2,
+        "class"
+      ],
+      [
+        "DHLShip",
+        "",
+        3,
+        2,
         "class"
       ]
     ],
@@ -220,103 +366,187 @@
         0,
         2,
         "dep"
+      ],
+      [
+        0,
+        3,
+        "dep"
+      ],
+      [
+        0,
+        4,
+        "dep"
+      ],
+      [
+        0,
+        5,
+        "dep"
+      ],
+      [
+        0,
+        6,
+        "dep"
       ]
     ],
     "snodes": [
       [
-        "FurnitureFactory",
-        "+ createChair(): Chair\n+ createSofa(): Sofa",
-        0.5,
-        0,
-        "interface"
-      ],
-      [
-        "ModernFactory",
-        "+ createChair(): Chair\n+ createSofa(): Sofa",
+        "Client",
+        "",
         0,
         1,
         "class"
       ],
       [
-        "VictorianFactory",
-        "+ createChair(): Chair\n+ createSofa(): Sofa",
+        "UPSFactory",
+        "",
         1,
-        1,
+        0,
         "class"
       ],
       [
-        "Chair",
-        "+ sitOn()",
-        2.5,
-        0,
+        "TransportFactory",
+        "+ createPlane()\n+ createShip()\n+ createTruck()",
+        1,
+        1,
         "interface"
       ],
       [
-        "ModernChair",
-        "+ sitOn()",
+        "DHLFactory",
+        "",
+        1,
         2,
-        1,
         "class"
       ],
       [
-        "VictorianChair",
-        "+ sitOn()",
-        3,
-        1,
-        "class"
-      ],
-      [
-        "Sofa",
-        "+ lieOn()",
-        4.5,
+        "UPSPlane",
+        "",
+        2.2,
         0,
+        "class"
+      ],
+      [
+        "UPSTruck",
+        "",
+        2.9,
+        0,
+        "class"
+      ],
+      [
+        "UPSShip",
+        "",
+        3.6,
+        0,
+        "class"
+      ],
+      [
+        "Transport",
+        "+ transport()",
+        2.9,
+        1,
         "interface"
       ],
       [
-        "ModernSofa",
-        "+ lieOn()",
-        4,
-        1,
+        "DHLPlane",
+        "",
+        2.2,
+        2,
         "class"
       ],
       [
-        "VictorianSofa",
-        "+ lieOn()",
-        5,
-        1,
+        "DHLTruck",
+        "",
+        2.9,
+        2,
+        "class"
+      ],
+      [
+        "DHLShip",
+        "",
+        3.6,
+        2,
         "class"
       ]
     ],
     "sedges": [
       [
-        1,
         0,
+        1,
+        "dep"
+      ],
+      [
+        0,
+        3,
+        "dep"
+      ],
+      [
+        1,
+        2,
         "real"
       ],
       [
+        3,
         2,
-        0,
         "real"
       ],
       [
         4,
-        3,
+        7,
         "real"
       ],
       [
         5,
-        3,
+        7,
         "real"
       ],
       [
-        7,
         6,
+        7,
         "real"
       ],
       [
         8,
-        6,
+        7,
         "real"
+      ],
+      [
+        9,
+        7,
+        "real"
+      ],
+      [
+        10,
+        7,
+        "real"
+      ],
+      [
+        1,
+        4,
+        "assoc"
+      ],
+      [
+        1,
+        5,
+        "assoc"
+      ],
+      [
+        1,
+        6,
+        "assoc"
+      ],
+      [
+        3,
+        8,
+        "assoc"
+      ],
+      [
+        3,
+        9,
+        "assoc"
+      ],
+      [
+        3,
+        10,
+        "assoc"
       ]
     ],
     "reuse": "abstractfactory.png",
@@ -325,33 +555,26 @@
   {
     "title": "Builder",
     "category": "Creational",
-    "case": "Cars and their manuals",
+    "case": "Houses with optional features",
     "desc": "Separate construction steps from the representation being assembled.",
-    "problem": "Long car constructors and separate manual assembly duplicate choices.",
-    "solution": "A director runs the same recipe against different builders.",
-    "before": "car = new Car(2, sportEngine, true)\nmanual = new Manual(2, \"sport\", \"GPS\")\n// maintain the same recipe twice",
-    "after": "builder = new CarBuilder()\ndirector.sportsCar(builder)\ncar = builder.getResult()\n// use ManualBuilder for a matching manual",
-    "module": "// Director.sportsCar(builder)\nbuilder.reset()\nbuilder.setSeats(2)\nbuilder.setEngine(sportEngine)\nbuilder.setGPS(true)",
+    "problem": "\u2022 House grows telescoping constructors (rooms/doors/windows + pool/trees/\u2026).\n\u2022 Client passes long positional bool lists\u2014unclear which flag is which.\n\u2022 Adding a feature forces new overloads and updates every call site.",
+    "solution": "\u2022 HouseBuilder names each step; ConcreteHouseBuilder adds extras.\n\u2022 HouseDirector encodes recipes (simple / family); Client can also chain steps.\n\u2022 Same houses; readable construction; product is House.",
+    "before": "houseA = new House(1, 1, 1)\nhouseB = new House(2, 2, 1, false, false, true, true)\nhouseC = new House(4, 3, 3, true, false, false, true)\nhouseD = new House(2, 1, 2, false, true, false, false)\nhouseE = new House(6, 4, 5, true, true, true, true)\n// five houses; magic bool positions",
+    "after": "director = new HouseDirector()\nhouseA = director.buildSimpleHouse(new ConcreteHouseBuilder())\nhouseB = new ConcreteHouseBuilder().addWindow().addWindow()\n    .addDoor().addDoor().addRoom().addStatues().addGarden().getResult()\nhouseC = director.buildFamilyHouse(new ConcreteHouseBuilder())\nhouseD = new ConcreteHouseBuilder().addWindow().addWindow()\n    .addDoor().addRoom().addRoom().addTrees().getResult()\nhouseE = new ConcreteHouseBuilder()\n    .addWindow().addWindow().addWindow().addWindow().addWindow().addWindow()\n    .addDoor().addDoor().addDoor().addDoor()\n    .addRoom().addRoom().addRoom().addRoom().addRoom()\n    .addPool().addTrees().addStatues().addGarden().getResult()\n// same five houses; named steps / director recipes",
+    "module": "",
     "pnodes": [
       [
         "Client",
-        "+ assemble()",
-        1,
+        "+ buildHouses()",
+        0,
         0,
         "class"
       ],
       [
-        "Car",
-        "+ Car(seats, engine, gps)",
+        "House",
+        "+ House(windows, doors, rooms)\n+ House(windows, doors, rooms, pool)\n+ House(windows, doors, rooms, pool, tree)\n+ House(windows, doors, rooms, pool, tree, statues)\n+ House(windows, doors, rooms, pool, tree, statues, garden)",
+        1.2,
         0,
-        2,
-        "class"
-      ],
-      [
-        "Manual",
-        "+ Manual(seats, engine, gps)",
-        2,
-        2,
         "class"
       ]
     ],
@@ -360,40 +583,42 @@
         0,
         1,
         "dep"
-      ],
-      [
-        0,
-        2,
-        "dep"
       ]
     ],
     "snodes": [
       [
-        "Director",
-        "+ sportsCar(b: Builder)",
+        "Client",
+        "+ buildHouses()",
         0,
         0,
         "class"
       ],
       [
-        "Builder",
-        "+ reset()\n+ setSeats(n)\n+ setEngine(e)\n+ setGPS(on)",
-        2,
+        "HouseBuilder",
+        "+ addRoom()\n+ addDoor()\n+ addWindow()\n+ getResult(): House",
+        1,
         0,
         "interface"
       ],
       [
-        "CarBuilder",
-        "+ getResult(): Car",
-        1,
-        2,
+        "HouseDirector",
+        "+ buildSimpleHouse(b)\n+ buildFamilyHouse(b)",
+        2.6,
+        0,
         "class"
       ],
       [
-        "ManualBuilder",
-        "+ getResult(): Manual",
-        2,
-        2,
+        "ConcreteHouseBuilder",
+        "+ addStatues()\n+ addTrees()\n+ addPool()\n+ addGarden()",
+        1,
+        1,
+        "class"
+      ],
+      [
+        "House",
+        "+ rooms: int\n+ doors: int\n+ windows: int",
+        2.6,
+        1,
         "class"
       ]
     ],
@@ -404,17 +629,27 @@
         "dep"
       ],
       [
+        0,
+        2,
+        "dep"
+      ],
+      [
         2,
         1,
-        "real"
+        "dep"
       ],
       [
         3,
         1,
         "real"
+      ],
+      [
+        3,
+        4,
+        "assoc"
       ]
     ],
-    "reuse": "",
+    "reuse": "builder.png",
     "url": "https://refactoring.guru/design-patterns/builder"
   },
   {
@@ -423,13 +658,13 @@
     "case": "XML stock data and JSON analytics",
     "desc": "Translate an existing interface into the interface a client expects.",
     "problem": "The stock app supplies XML; the analytics library requires JSON.",
-    "solution": "An adapter accepts XML, converts it, then delegates analytics.",
-    "before": "xml = provider.getStockData()\nlibrary = new JsonAnalyticsLibrary()\nreport = library.analyze(xml)\n// incompatible input format",
-    "after": "service = new XmlAnalyticsAdapter(library)\nxml = provider.getStockData()\nreport = service.analyze(xml)",
-    "module": "// XmlAnalyticsAdapter.analyze(xml)\njson = convertXmlToJson(xml)\nreturn library.analyze(json)",
+    "solution": "Adapter inherits AnalyticsService and composes JsonAnalyticsLibrary; converts then delegates.",
+    "before": "xml = provider.getStockData()\njson = convertXmlToJson(xml)\nreport = library.analyze(json)\n// same stock report; client does the conversion",
+    "after": "xml = provider.getStockData()\nreport = adapter.analyze(xml)\n// same stock report; adapter owns the conversion",
+    "module": "// MODULE \u2014 AnalyticsService API for client developers\n// XmlAnalyticsAdapter extends AnalyticsService\n// composes library: JsonAnalyticsLibrary\n// analyze(xml):\n//   json = convert(xml)\n//   return library.analyze(json)",
     "pnodes": [
       [
-        "StockApplication",
+        "Client",
         "+ analyzeStocks()",
         0,
         0,
@@ -439,7 +674,7 @@
         "StockDataProvider",
         "+ getStockData(): XML",
         0,
-        2,
+        1,
         "class"
       ],
       [
@@ -464,7 +699,7 @@
     ],
     "snodes": [
       [
-        "StockApplication",
+        "Client",
         "- analytics: AnalyticsService\n+ analyzeStocks()",
         0,
         0,
@@ -472,22 +707,22 @@
       ],
       [
         "AnalyticsService",
-        "+ analyze(xml): Report",
-        2,
+        "+ analyze(xml): Report {abstract}",
+        1.5,
         0,
-        "interface"
+        "abstract"
       ],
       [
         "XmlAnalyticsAdapter",
-        "- library: JsonAnalyticsLibrary\n+ analyze(xml): Report",
-        2,
+        "- library: JsonAnalyticsLibrary\n+ analyze(xml): Report\n- convert(xml): JSON",
+        1.5,
         1,
         "class"
       ],
       [
         "JsonAnalyticsLibrary",
         "+ analyze(json): Report",
-        0,
+        3.2,
         1,
         "class"
       ]
@@ -501,12 +736,12 @@
       [
         2,
         1,
-        "real"
+        "gen"
       ],
       [
         2,
         3,
-        "assoc"
+        "compose"
       ]
     ],
     "reuse": "adapter.png",
@@ -519,96 +754,103 @@
     "desc": "Separate two independent dimensions so both can evolve independently.",
     "problem": "Each shape/color combination requires another subclass.",
     "solution": "Shapes hold a Color reference instead of encoding color in inheritance.",
-    "before": "redCircle = new RedCircle()\nblueSquare = new BlueSquare()\nredCircle.draw()\n// more combinations, more classes",
-    "after": "shape = new Circle(new Red())\nshape.draw()\nshape.color = new Blue()\nshape.draw()",
-    "module": "// Circle.draw()\ncolor.apply()\nrenderCircleGeometry()\n// color and geometry vary independently",
+    "before": "new RedCircle().draw()\nnew BlueSquare().draw()\n// red circle + blue square; one class per combo",
+    "after": "shapes = [new Circle(new Red()),\n          new Square(new Blue())]\nfor s in shapes: s.draw()\n// same two drawings; compose shape \u00d7 color",
+    "module": "// MODULE \u2014 Shape API for client developers\n// Circle.draw()\ncolor.apply()\nrenderCircleGeometry()\n// color and geometry vary independently",
     "pnodes": [
-      [
-        "Shape",
-        "+ draw()",
-        1,
-        0,
-        "abstract"
-      ],
       [
         "RedCircle",
         "+ draw()",
         0,
-        2,
+        0,
         "class"
       ],
       [
         "BlueCircle",
         "+ draw()",
-        1,
-        2,
+        1.2,
+        0,
         "class"
       ],
       [
         "RedSquare",
         "+ draw()",
-        2,
-        2,
+        2.4,
+        0,
+        "class"
+      ],
+      [
+        "Client",
+        "+ render()",
+        1.2,
+        1,
         "class"
       ]
     ],
     "pedges": [
       [
-        1,
+        3,
         0,
-        "gen"
-      ],
-      [
-        2,
-        0,
-        "gen"
+        "dep"
       ],
       [
         3,
-        0,
-        "gen"
+        1,
+        "dep"
+      ],
+      [
+        3,
+        2,
+        "dep"
       ]
     ],
     "snodes": [
       [
+        "Client",
+        "+ render()",
+        0,
+        0,
+        "class"
+      ],
+      [
         "Shape",
         "- color: Color\n+ draw() {abstract}",
-        0.5,
+        1.2,
         0,
         "abstract"
       ],
       [
         "Color",
         "+ apply()",
-        2.5,
+        3.2,
         0,
         "interface"
       ],
       [
         "Circle",
         "+ draw()",
-        0,
+        0.7,
         1,
         "class"
       ],
       [
         "Square",
         "+ draw()",
-        1,
+        1.7,
         1,
         "class"
       ],
       [
         "Red",
         "+ apply()",
-        2,
+        2.7,
         1,
         "class"
       ],
       [
         "Blue",
         "+ apply()",
-        3,
+        3.7,
         1,
         "class"
       ]
@@ -617,26 +859,31 @@
       [
         0,
         1,
-        "assoc"
+        "dep"
       ],
       [
+        1,
         2,
-        0,
-        "gen"
+        "compose"
       ],
       [
         3,
-        0,
+        1,
         "gen"
       ],
       [
         4,
         1,
-        "real"
+        "gen"
       ],
       [
         5,
-        1,
+        2,
+        "real"
+      ],
+      [
+        6,
+        2,
         "real"
       ]
     ],
@@ -650,9 +897,9 @@
     "desc": "Expose a simple entry point to a complex subsystem.",
     "problem": "Every client coordinates codecs, bitrate conversion, and audio repair.",
     "solution": "A facade orchestrates the subsystem behind one conversion call.",
-    "before": "codec = CodecFactory.extract(file)\nraw = BitrateReader.read(file, codec)\nvideo = BitrateReader.convert(raw, mp4)\nresult = AudioMixer.fix(video)",
-    "after": "converter = new VideoConverter()\nresult = converter.convert(file, \"mp4\")",
-    "module": "// VideoConverter.convert(file, format)\nsource = CodecFactory.extract(file)\nraw = BitrateReader.read(file, source)\nvideo = BitrateReader.convert(raw, codecFor(format))\nreturn AudioMixer.fix(video)",
+    "before": "codec = CodecFactory.extract(file)\nraw = BitrateReader.read(file, codec)\nvideo = BitrateReader.convert(raw, mp4)\nresult = AudioMixer.fix(video)\n// export file as mp4 via subsystem steps",
+    "after": "result = new VideoConverter().convert(file, \"mp4\")\n// same mp4 export; one facade call",
+    "module": "// MODULE \u2014 VideoConverter facade API for client developers\n// VideoConverter.convert(file, format)\nsource = CodecFactory.extract(file)\nraw = BitrateReader.read(file, source)\nvideo = BitrateReader.convert(raw, codecFor(format))\nreturn AudioMixer.fix(video)",
     "pnodes": [
       [
         "Client",
@@ -665,21 +912,21 @@
         "CodecFactory",
         "+ extract(file)",
         0,
-        2,
+        1,
         "class"
       ],
       [
         "BitrateReader",
         "+ read()\n+ convert()",
         1,
-        2,
+        1,
         "class"
       ],
       [
         "AudioMixer",
         "+ fix(video)",
         2,
-        2,
+        1,
         "class"
       ]
     ],
@@ -719,21 +966,21 @@
         "CodecFactory",
         "+ extract(file)",
         0,
-        2,
+        1,
         "class"
       ],
       [
         "BitrateReader",
         "+ read()\n+ convert()",
         1,
-        2,
+        1,
         "class"
       ],
       [
         "AudioMixer",
         "+ fix(video)",
         2,
-        2,
+        1,
         "class"
       ]
     ],
@@ -765,24 +1012,24 @@
   {
     "title": "Proxy",
     "category": "Structural",
-    "case": "Cached third-party video service",
-    "desc": "Control access to a service through the same interface.",
-    "problem": "Repeated video downloads invoke the remote service again.",
-    "solution": "A proxy caches results and delegates only on a cache miss.",
-    "before": "service = new ThirdPartyVideoService()\na = service.downloadVideo(id)\nb = service.downloadVideo(id)\n// two remote requests",
-    "after": "service = new CachedVideoProxy(realService)\na = service.downloadVideo(id)\nb = service.downloadVideo(id)\n// second request uses the cache",
-    "module": "// CachedVideoProxy.downloadVideo(id)\nif not cache.contains(id):\n    cache[id] = real.downloadVideo(id)\nreturn cache[id]",
+    "case": "Expensive database service with caching",
+    "desc": "A stand-in object that controls access to a real service without changing its interface.",
+    "problem": "\u2022 The real service is expensive to create or use (e.g. database, remote API, large object).\n\u2022 Repeated queries can be slow and waste resources.\n\u2022 The client may need to handle initialization or access control logic.\n\u2022 We want extra behavior (caching, logging, access control) without changing client code.",
+    "solution": "\u2022 Introduce a proxy that implements the same interface as the real service.\n\u2022 The proxy controls access, adding lazy init, caching, logging, or access control.\n\u2022 Client uses the same interface\u2014only the class it instantiates changes.\n\u2022 Adds: caching, lazy initialization, optional access control and logging.",
+    "before": "db = new ExpensiveDatabaseService()\nr1 = db.query(\"users\")\nr2 = db.query(\"users\")\n// two \"users\" results; two expensive hits",
+    "after": "db = new DatabaseProxy()\nr1 = db.query(\"users\")\nr2 = db.query(\"users\")\n// same two \"users\" results; second from cache",
+    "module": "// MODULE \u2014 DatabaseService API for client developers\n// DatabaseProxy.query(key)\nif cache.contains(key): return cache[key]\nif realService == null: realService = new RealDatabaseService()\nresult = realService.query(key)\ncache[key] = result; return result",
     "pnodes": [
       [
-        "VideoManager",
-        "+ play(id)",
+        "Client",
+        "+ run()",
         0,
         0,
         "class"
       ],
       [
-        "ThirdPartyVideoService",
-        "+ downloadVideo(id): Video",
+        "ExpensiveDatabaseService",
+        "+ ExpensiveDatabaseService()\n+ query(key): Result",
         2,
         1,
         "class"
@@ -797,29 +1044,29 @@
     ],
     "snodes": [
       [
-        "VideoManager",
-        "- service: VideoService\n+ play(id)",
+        "Client",
+        "+ run()",
         0,
         0,
         "class"
       ],
       [
-        "VideoService",
-        "+ downloadVideo(id): Video",
+        "DatabaseService",
+        "+ query(key: String): Result",
         1.5,
         0,
         "interface"
       ],
       [
-        "CachedVideoProxy",
-        "- real: VideoService\n- cache: Map\n+ downloadVideo(id): Video",
+        "DatabaseProxy",
+        "- realService: DatabaseService\n- cache: Map\n+ query(key): Result\n- getRealService()",
         0.5,
         1,
         "class"
       ],
       [
-        "ThirdPartyVideoService",
-        "+ downloadVideo(id): Video",
+        "RealDatabaseService",
+        "+ query(key): Result",
         2.5,
         1,
         "class"
@@ -828,8 +1075,8 @@
     "sedges": [
       [
         0,
-        1,
-        "assoc"
+        2,
+        "dep"
       ],
       [
         2,
@@ -857,12 +1104,12 @@
     "desc": "Treat individual objects and recursive groups through one interface.",
     "problem": "Pricing code distinguishes products from nested boxes repeatedly.",
     "solution": "A box sums child prices; each child follows the same contract.",
-    "before": "total = 0\nfor item in box.contents:\n    if item is Product: total += item.price\n    else: total += priceNestedBox(item)",
-    "after": "order = new Box([product, innerBox])\ntotal = order.getPrice()\n// leaf and group are both OrderItem",
-    "module": "// Box.getPrice()\ntotal = 0\nfor child in children:\n    total += child.getPrice()\nreturn total",
+    "before": "total = 0\nfor item in order.contents:\n    if item is Product: total += item.price\n    else: total += priceNestedBox(item)\n// price of product + nested box",
+    "after": "total = order.getPrice()\n// same total; one getPrice() on OrderItem",
+    "module": "// MODULE \u2014 OrderItem API for client developers\n// Box.getPrice()\ntotal = 0\nfor child in children:\n    total += child.getPrice()\nreturn total",
     "pnodes": [
       [
-        "PriceClient",
+        "Client",
         "+ total(box)",
         1,
         0,
@@ -871,15 +1118,15 @@
       [
         "Product",
         "+ price: Money",
-        0,
-        2,
+        0.5,
+        1,
         "class"
       ],
       [
         "Box",
         "+ contents: List",
-        2,
-        2,
+        1.5,
+        1,
         "class"
       ]
     ],
@@ -897,41 +1144,53 @@
     ],
     "snodes": [
       [
+        "Client",
+        "+ total(item)",
+        0,
+        0,
+        "class"
+      ],
+      [
         "OrderItem",
         "+ getPrice(): Money",
-        1,
+        2.2,
         0,
         "interface"
       ],
       [
         "Product",
         "- price: Money\n+ getPrice(): Money",
-        0,
-        2,
+        1.6,
+        1.25,
         "class"
       ],
       [
         "Box",
         "- children: OrderItem[0..*]\n+ getPrice(): Money\n+ add(item)",
-        2,
-        2,
+        2.8,
+        1.25,
         "class"
       ]
     ],
     "sedges": [
       [
+        0,
         1,
-        0,
-        "real"
+        "dep"
       ],
       [
         2,
-        0,
+        1,
         "real"
       ],
       [
-        2,
-        0,
+        3,
+        1,
+        "real"
+      ],
+      [
+        3,
+        1,
         "aggregate"
       ]
     ],
@@ -945,9 +1204,9 @@
     "desc": "Fix an algorithm\u2019s order while subclasses implement selected steps.",
     "problem": "Format-specific miners duplicate the processing and reporting pipeline.",
     "solution": "Move the sequence into a base method; override extraction only.",
-    "before": "if format == \"pdf\":\n    data = pdf.extract(path)\nelse: data = csv.extract(path)\nreport = analyze(data)",
-    "after": "miner = new PdfMiner()\nreport = miner.mine(path)\n// CsvMiner uses the same pipeline",
-    "module": "// DataMiner.mine(path): fixed sequence\ndata = extract(path)\nreturn analyze(data)\n// PdfMiner.extract(path): return parsePdf(path)",
+    "before": "pdfReport = analyze(pdf.extract(pdfPath))\ncsvReport = analyze(csv.extract(csvPath))\n// two reports; client repeats extract+analyze",
+    "after": "miners = [new PdfMiner(), new CsvMiner()]\nreports = []\nfor m in miners: reports.add(m.mine(pathFor(m)))\n// same two reports; one mine() pipeline each",
+    "module": "// MODULE \u2014 DataMiner.mine API for client developers\n// DataMiner.mine(path): fixed sequence\ndata = extract(path)\nreturn analyze(data)\n// PdfMiner.extract(path): return parsePdf(path)",
     "pnodes": [
       [
         "Client",
@@ -960,14 +1219,14 @@
         "PdfMiner",
         "+ extract(path)\n+ analyze(data)",
         0,
-        2,
+        1,
         "class"
       ],
       [
         "CsvMiner",
         "+ extract(path)\n+ analyze(data)",
         2,
-        2,
+        1,
         "class"
       ]
     ],
@@ -985,36 +1244,48 @@
     ],
     "snodes": [
       [
+        "Client",
+        "+ run()",
+        0,
+        0,
+        "class"
+      ],
+      [
         "DataMiner",
         "+ mine(path): Report\n# extract(path): Data {abstract}\n# analyze(data): Report",
-        1,
+        1.5,
         0,
         "abstract"
       ],
       [
         "PdfMiner",
         "# extract(path): Data",
-        0,
+        1,
         1,
         "class"
       ],
       [
         "CsvMiner",
         "# extract(path): Data",
-        2,
+        2.5,
         1,
         "class"
       ]
     ],
     "sedges": [
       [
-        1,
         0,
-        "gen"
+        1,
+        "dep"
       ],
       [
         2,
-        0,
+        1,
+        "gen"
+      ],
+      [
+        3,
+        1,
         "gen"
       ]
     ],
@@ -1028,52 +1299,72 @@
     "desc": "Make alternative algorithms interchangeable through a shared contract.",
     "problem": "A navigator grows conditionals for road, walking, and transit routes.",
     "solution": "Delegate routing to a strategy selected by the client.",
-    "before": "if mode == \"road\": route = roadRoute(a, b)\nelif mode == \"walk\": route = walkRoute(a, b)\nelse: route = transitRoute(a, b)",
-    "after": "navigator.setStrategy(new WalkingRoute())\nroute = navigator.buildRoute(a, b)\n// choose another strategy at runtime",
-    "module": "// Navigator.buildRoute(a, b)\nreturn strategy.buildRoute(a, b)\n// WalkingRoute builds pedestrian paths",
+    "before": "road = roadRoute(a, b)\nwalk = walkRoute(a, b)\ntransit = transitRoute(a, b)\n// three routes; client branches per mode",
+    "after": "for s in [new RoadRoute(), new WalkingRoute(),\n          new TransitRoute()]:\n    navigator.setStrategy(s)\n    routes.add(navigator.buildRoute(a, b))\n// same three routes; one buildRoute() API",
+    "module": "// MODULE \u2014 Navigator API for client developers\n// Navigator.buildRoute(a, b)\nreturn strategy.buildRoute(a, b)\n// WalkingRoute builds pedestrian paths",
     "pnodes": [
+      [
+        "Client",
+        "+ navigate()",
+        0,
+        0,
+        "class"
+      ],
       [
         "Navigator",
         "- mode: String\n+ buildRoute(a, b): Route",
-        1,
-        1,
+        2,
+        0,
         "class"
       ]
     ],
-    "pedges": [],
+    "pedges": [
+      [
+        0,
+        1,
+        "dep"
+      ]
+    ],
     "snodes": [
+      [
+        "Client",
+        "+ navigate()",
+        0,
+        0,
+        "class"
+      ],
       [
         "Navigator",
         "- strategy: RouteStrategy\n+ setStrategy(s)\n+ buildRoute(a, b): Route",
-        0,
+        1,
         0,
         "class"
       ],
       [
         "RouteStrategy",
         "+ buildRoute(a, b): Route",
-        2,
+        2.5,
         0,
         "interface"
       ],
       [
         "RoadRoute",
         "+ buildRoute(a, b): Route",
-        1,
+        1.5,
         1,
         "class"
       ],
       [
         "WalkingRoute",
         "+ buildRoute(a, b): Route",
-        2,
+        2.5,
         1,
         "class"
       ],
       [
         "TransitRoute",
         "+ buildRoute(a, b): Route",
-        3,
+        3.5,
         1,
         "class"
       ]
@@ -1082,21 +1373,26 @@
       [
         0,
         1,
+        "dep"
+      ],
+      [
+        1,
+        2,
         "assoc"
       ],
       [
-        2,
-        1,
-        "real"
-      ],
-      [
         3,
-        1,
+        2,
         "real"
       ],
       [
         4,
-        1,
+        2,
+        "real"
+      ],
+      [
+        5,
+        2,
         "real"
       ]
     ],
@@ -1110,52 +1406,72 @@
     "desc": "Delegate behavior to an object representing the current state.",
     "problem": "Publication rules accumulate in a switch over document status.",
     "solution": "Each state handles publish and can transition the document.",
-    "before": "if doc.status == \"draft\":\n    doc.status = \"moderation\"\nelif doc.status == \"moderation\" and user.isAdmin:\n    doc.status = \"published\"",
-    "after": "doc = new Document(new Draft())\ndoc.publish(user)  // enters moderation\ndoc.publish(admin) // becomes published",
-    "module": "// Moderation.publish(doc, user)\nif user.isAdmin:\n    doc.changeState(new Published())\n// Published.publish(...) does nothing",
+    "before": "doc.status = \"draft\"\ndoc.status = \"moderation\"   // submit\ndoc.status = \"published\"    // admin approve\n// draft \u2192 moderation \u2192 published via status ifs",
+    "after": "doc = new Document(new Draft())\ndoc.publish(user)   // enters moderation\ndoc.publish(admin)  // becomes published\n// same draft \u2192 moderation \u2192 published path",
+    "module": "// MODULE \u2014 Document.publish API for client developers\n// Moderation.publish(doc, user)\nif user.isAdmin:\n    doc.changeState(new Published())\n// Published.publish(...) does nothing",
     "pnodes": [
+      [
+        "Client",
+        "+ publishDoc()",
+        0,
+        0,
+        "class"
+      ],
       [
         "Document",
         "- status: String\n+ publish(user)",
-        1,
-        1,
+        2,
+        0,
         "class"
       ]
     ],
-    "pedges": [],
+    "pedges": [
+      [
+        0,
+        1,
+        "dep"
+      ]
+    ],
     "snodes": [
+      [
+        "Client",
+        "+ publishDoc()",
+        0,
+        0,
+        "class"
+      ],
       [
         "Document",
         "- state: PublicationState\n+ publish(user)\n+ changeState(s)",
-        0,
+        1,
         0,
         "class"
       ],
       [
         "PublicationState",
         "+ publish(doc, user)",
-        2,
+        2.5,
         0,
         "interface"
       ],
       [
         "Draft",
         "+ publish(doc, user)",
-        1,
+        1.5,
         1,
         "class"
       ],
       [
         "Moderation",
         "+ publish(doc, user)",
-        2,
+        2.5,
         1,
         "class"
       ],
       [
         "Published",
         "+ publish(doc, user)",
-        3,
+        3.5,
         1,
         "class"
       ]
@@ -1164,21 +1480,26 @@
       [
         0,
         1,
+        "dep"
+      ],
+      [
+        1,
+        2,
         "assoc"
       ],
       [
-        2,
-        1,
-        "real"
-      ],
-      [
         3,
-        1,
+        2,
         "real"
       ],
       [
         4,
-        1,
+        2,
+        "real"
+      ],
+      [
+        5,
+        2,
         "real"
       ]
     ],
@@ -1192,10 +1513,17 @@
     "desc": "Notify registered subscribers when a publisher emits an event.",
     "problem": "Editor logic directly invokes concrete logging and email services.",
     "solution": "Publish an event; subscribers handle their own reactions.",
-    "before": "editor.saveFile()\nlogger.write(file.name)\nmailer.send(file.name)\n// client must wire every reaction",
-    "after": "events.subscribe(\"save\", new LogListener())\nevents.subscribe(\"save\", new EmailListener())\neditor.saveFile() // emits save event",
-    "module": "// EventManager.notify(type, data)\nfor listener in listeners[type]:\n    listener.update(data)\n// Editor.saveFile(): write(); events.notify(\"save\", name)",
+    "before": "editor.saveFile()\nlogger.write(file.name)\nmailer.send(file.name)\n// save + log + email; client wires reactions",
+    "after": "events.subscribe(\"save\", new LogListener())\nevents.subscribe(\"save\", new EmailListener())\neditor.saveFile()\n// same save + log + email; listeners react",
+    "module": "// MODULE \u2014 EventManager API for client developers\n// EventManager.notify(type, data)\nfor listener in listeners[type]:\n    listener.update(data)\n// Editor.saveFile(): write(); events.notify(\"save\", name)",
     "pnodes": [
+      [
+        "Client",
+        "+ save()",
+        0,
+        0,
+        "class"
+      ],
       [
         "Editor",
         "+ saveFile()",
@@ -1207,14 +1535,14 @@
         "Logger",
         "+ write(name)",
         0,
-        2,
+        1,
         "class"
       ],
       [
         "Mailer",
         "+ send(name)",
         2,
-        2,
+        1,
         "class"
       ]
     ],
@@ -1225,45 +1553,57 @@
         "dep"
       ],
       [
-        0,
+        1,
         2,
+        "dep"
+      ],
+      [
+        1,
+        3,
         "dep"
       ]
     ],
     "snodes": [
       [
+        "Client",
+        "+ setup()",
+        0,
+        0,
+        "class"
+      ],
+      [
         "Editor",
         "- events: EventManager\n+ saveFile()",
-        0,
+        1,
         0,
         "class"
       ],
       [
         "EventManager",
-        "- listeners: EventListener[0..*]\n+ subscribe(type, listener)\n+ unsubscribe(type, listener)\n+ notify(type, data)",
-        1,
-        1,
+        "- listeners: EventListener[0..*]\n+ subscribe(type, listener)\n+ notify(type, data)",
+        2,
+        0,
         "class"
       ],
       [
         "EventListener",
         "+ update(data)",
-        2,
+        3,
         0,
         "interface"
       ],
       [
         "LogListener",
         "+ update(data)",
-        0,
         2,
+        1,
         "class"
       ],
       [
         "EmailListener",
         "+ update(data)",
-        2,
-        2,
+        3,
+        1,
         "class"
       ]
     ],
@@ -1271,7 +1611,12 @@
       [
         0,
         1,
-        "assoc"
+        "dep"
+      ],
+      [
+        0,
+        2,
+        "dep"
       ],
       [
         1,
@@ -1279,13 +1624,18 @@
         "assoc"
       ],
       [
-        3,
         2,
-        "real"
+        3,
+        "assoc"
       ],
       [
         4,
-        2,
+        3,
+        "real"
+      ],
+      [
+        5,
+        3,
         "real"
       ]
     ],
@@ -1299,56 +1649,80 @@
     "desc": "Represent a request as an object that can be invoked and undone.",
     "problem": "Buttons and shortcuts duplicate editing actions without shared undo.",
     "solution": "Bind both triggers to a command; store successful edits in history.",
-    "before": "pasteButton.onClick(() => editor.insert(text))\nshortcut.onPress(() => editor.insert(text))\n// duplicated action; no undo record",
-    "after": "paste = new PasteCommand(editor, text)\npasteButton.bind(() => app.execute(paste))\nshortcut.bind(() => app.execute(paste))\napp.undo()",
-    "module": "// PasteCommand.execute()\nbackup = editor.text; editor.insert(text)\nreturn true  // app records command in history\n// undo(): editor.text = backup",
+    "before": "pasteButton.click()  // editor.insert(text)\nshortcut.press()     // editor.insert(text)\n// paste from two triggers; logic duplicated, no undo",
+    "after": "paste = new PasteCommand(editor, text)\npasteButton.bind(() => app.execute(paste))\nshortcut.bind(() => app.execute(paste))\npasteButton.click(); shortcut.press()\n// same two pastes via shared command",
+    "module": "// MODULE \u2014 Command API for client developers\n// PasteCommand.execute()\nbackup = editor.text; editor.insert(text)\nreturn true  // app records command in history\n// undo(): editor.text = backup",
     "pnodes": [
+      [
+        "Client",
+        "+ trigger()",
+        1,
+        0,
+        "class"
+      ],
       [
         "PasteButton",
         "+ click()",
         0,
-        0,
+        1,
         "class"
       ],
       [
         "Shortcut",
         "+ press()",
-        2,
-        0,
+        1,
+        1,
         "class"
       ],
       [
         "Editor",
         "+ insert(text)",
-        1,
         2,
+        1,
         "class"
       ]
     ],
     "pedges": [
       [
         0,
+        1,
+        "dep"
+      ],
+      [
+        0,
         2,
         "dep"
       ],
       [
         1,
+        3,
+        "dep"
+      ],
+      [
         2,
+        3,
         "dep"
       ]
     ],
     "snodes": [
       [
+        "Client",
+        "+ trigger()",
+        0,
+        0,
+        "class"
+      ],
+      [
         "Application",
         "- history: Command[*]\n+ execute(command)\n+ undo()",
-        0,
+        1,
         0,
         "class"
       ],
       [
         "Command",
         "+ execute(): Boolean\n+ undo()",
-        2,
+        2.5,
         0,
         "interface"
       ],
@@ -1356,14 +1730,14 @@
         "PasteCommand",
         "- editor: Editor\n- backup: String\n+ execute(): Boolean\n+ undo()",
         2,
-        2,
+        1,
         "class"
       ],
       [
         "Editor",
         "+ text: String\n+ insert(text)",
-        0,
-        2,
+        0.5,
+        1,
         "class"
       ]
     ],
@@ -1371,16 +1745,21 @@
       [
         0,
         1,
+        "dep"
+      ],
+      [
+        1,
+        2,
         "assoc"
       ],
       [
+        3,
         2,
-        1,
         "real"
       ],
       [
-        2,
         3,
+        4,
         "assoc"
       ]
     ],
